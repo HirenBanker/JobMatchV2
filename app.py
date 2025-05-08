@@ -79,7 +79,7 @@ if not st.session_state.get('logged_in', False):
             col1_about, col2_about = st.columns(2)
             with col1_about:
                 # You can replace these placeholders with actual image paths or URLs
-                st.image("assets/images/our_vision.png", caption="Our Vision", use_container_width=True)
+                st.image("assets/images/our_vision.png", caption="Our Vision")
                 st.subheader("Our Vision")
                 st.markdown("""
                 To be the leading job matching platform, recognized for innovation, user satisfaction, 
@@ -88,7 +88,7 @@ if not st.session_state.get('logged_in', False):
                 """)
 
             with col2_about:
-                st.image("assets/images/our_technology.png", caption="Our Technology", use_container_width=True)
+                st.image("assets/images/our_technology.png", caption="Our Technology")
                 st.subheader("Our Technology")
                 st.markdown("""
                 JobMatch leverages modern technology to provide a smart, fast, and reliable experience. 
@@ -97,7 +97,7 @@ if not st.session_state.get('logged_in', False):
 
         with tab3:
             st.header("Contact Us")
-            st.image("https://via.placeholder.com/400x200.png?text=Get+In+Touch+Image", caption="We're here to help!", use_container_width=True)
+            st.image("https://via.placeholder.com/400x200.png?text=Get+In+Touch+Image", caption="We're here to help!")
             st.subheader("Get in Touch")
             st.markdown("""
             We value your feedback and are here to assist you with any inquiries.
