@@ -76,7 +76,15 @@ class User:
             )
         except psycopg2.Error as e:
             conn.rollback()
-            print(f"Error creating user: {e}")
+            print(f"DATABASE ERROR in User.create for {username}: {type(e).__name__} - {e}")
+            import traceback
+            print(traceback.format_exc())
+            return None
+        except Exception as ex: # Catch any other unexpected error during user creation
+            conn.rollback()
+            print(f"UNEXPECTED ERROR in User.create for {username}: {type(ex).__name__} - {ex}")
+            import traceback
+            print(traceback.format_exc())
             return None
         finally:
             cursor.close()

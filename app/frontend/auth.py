@@ -107,17 +107,24 @@ def register_page():
         
         # Create user
         user_type_value = "job_seeker" if user_type == "Job Seeker" else "job_giver"
+        print(f"AUTH.PY: Attempting to register user: username='{username}', email='{email}', type='{user_type_value}'") # DEBUG
         user = User.create(username, email, password, user_type_value)
         
         if user:
             st.success("Registration successful! Please login.")
+            print(f"AUTH.PY: Successfully registered user: {username}, ID: {user.id}") # DEBUG
             st.session_state.auth_view = 'login' # Redirect to login after successful registration
             st.rerun()
         else:
+            # This block is hit if User.create returns None
             st.error("Registration failed. Please try again.")
+            print(f"AUTH.PY: Registration failed for user: {username}. User.create returned: {user}") # DEBUG
+            # The User.create method itself should print specific database errors.
+            # This message confirms that the frontend received a None from User.create.
 
     st.markdown("---")
     if st.button("← Back to Login", key="register_back_to_login"):
+        print("AUTH.PY: User clicked 'Back to Login' from register page.") # DEBUG
         st.session_state.auth_view = 'login'
         st.rerun()
 
