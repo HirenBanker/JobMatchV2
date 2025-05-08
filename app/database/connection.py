@@ -3,58 +3,72 @@ import psycopg2
 from psycopg2 import sql
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 from dotenv import load_dotenv
+import urllib.parse # For parsing DATABASE_URL
 
 # Load environment variables
 load_dotenv()
 
-# Database configuration
-DB_HOST = os.getenv("DB_HOST", "localhost")
-DB_PORT = os.getenv("DB_PORT", "5432")
-DB_USER = os.getenv("DB_USER", "postgres")
-DB_PASSWORD = os.getenv("DB_PASSWORD", "password")
-DB_NAME = os.getenv("DB_NAME", "jobmatch")
+# DATABASE_URL will be used. For local dev, set it in .env
+# e.g., DATABASE_URL=postgresql://user:password@host:port/dbname
 
 def get_connection():
     """Create a connection to the PostgreSQL database"""
     try:
-        conn = psycopg2.connect(
-            host=DB_HOST,
-            port=DB_PORT,
-            user=DB_USER,
-            password=DB_PASSWORD,
-            database=DB_NAME
-        )
+        database_url = os.environ.get("DATABASE_URL")
+        if not database_url:
+            print("Error: DATABASE_URL environment variable not set.")
+            # In a Streamlit app, you might want to st.error or raise an exception
+            # For now, returning None is consistent with original behavior on error.
+            return None
+        conn = psycopg2.connect(database_url)
         return conn
     except psycopg2.Error as e:
         print(f"Error connecting to PostgreSQL database: {e}")
         return None
 
 def create_database_if_not_exists():
-    """Create the database if it doesn't exist"""
+    """Create the database specified in DATABASE_URL if it doesn't exist.
+    This is primarily for local development. Render usually creates the database.
+    """
+    database_url_str = os.environ.get("DATABASE_URL")
+    if not database_url_str:
+        print("Error: DATABASE_URL not set. Cannot create database.")
+        return
+
     try:
-        # Connect to default postgres database
-        conn = psycopg2.connect(
-            host=DB_HOST,
-            port=DB_PORT,
-            user=DB_USER,
-            password=DB_PASSWORD,
-            database="postgres"
-        )
+        parsed_url = urllib.parse.urlparse(database_url_str)
+        target_db_name = parsed_url.path.lstrip('/')
+        if not target_db_name:
+            print(f"Error: Could not determine database name from DATABASE_URL: {database_url_str}")
+            return
+
+        # Create a new URL to connect to the 'postgres' database on the same server
+        # This allows us to check for and create the target database.
+        postgres_db_url_parts = parsed_url._replace(path="/postgres")
+        postgres_db_url = urllib.parse.urlunparse(postgres_db_url_parts)
+
+        conn = psycopg2.connect(postgres_db_url)
         conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
         cursor = conn.cursor()
         
         # Check if database exists
-        cursor.execute("SELECT 1 FROM pg_catalog.pg_database WHERE datname = %s", (DB_NAME,))
+        cursor.execute("SELECT 1 FROM pg_catalog.pg_database WHERE datname = %s", (target_db_name,))
         exists = cursor.fetchone()
         
         if not exists:
-            cursor.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(DB_NAME)))
-            print(f"Database {DB_NAME} created successfully")
+            cursor.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(target_db_name)))
+            print(f"Database '{target_db_name}' created successfully")
+        else:
+            print(f"Database '{target_db_name}' already exists or check was inconclusive.")
         
         cursor.close()
         conn.close()
     except psycopg2.Error as e:
-        print(f"Error creating database: {e}")
+        print(f"Error in create_database_if_not_exists for '{target_db_name}': {e}")
+        print("This might be okay if the database already exists and the user lacks privileges to list/create databases, "
+              "or if connecting to the 'postgres' database failed.")
+    except Exception as e:
+        print(f"An unexpected error occurred in create_database_if_not_exists: {e}")
 
 def init_tables():
     """Initialize database tables"""

@@ -2,26 +2,18 @@ import psycopg2
 import os
 from dotenv import load_dotenv
 
-# Load environment variables
+# Load environment variables (will pick up DATABASE_URL from .env for local testing)
 load_dotenv()
-
-# Database configuration
-DB_HOST = os.getenv("DB_HOST", "localhost")
-DB_PORT = os.getenv("DB_PORT", "5432")
-DB_USER = os.getenv("DB_USER", "postgres")
-DB_PASSWORD = os.getenv("DB_PASSWORD", "password")
-DB_NAME = os.getenv("DB_NAME", "jobmatch")
 
 def get_connection():
     """Create a connection to the PostgreSQL database"""
     try:
-        conn = psycopg2.connect(
-            host=DB_HOST,
-            port=DB_PORT,
-            user=DB_USER,
-            password=DB_PASSWORD,
-            database=DB_NAME
-        )
+        database_url = os.environ.get("DATABASE_URL")
+        if not database_url:
+            print("Error: DATABASE_URL environment variable not set.")
+            print("Ensure it's in your .env file for local use or set by your deployment environment.")
+            return None
+        conn = psycopg2.connect(database_url)
         return conn
     except psycopg2.Error as e:
         print(f"Error connecting to PostgreSQL database: {e}")

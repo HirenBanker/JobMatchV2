@@ -5,13 +5,9 @@ from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
-
-# Database configuration
-DB_HOST = os.getenv("DB_HOST", "localhost")
-DB_PORT = os.getenv("DB_PORT", "5432")
-DB_USER = os.getenv("DB_USER", "postgres")
-DB_PASSWORD = os.getenv("DB_PASSWORD", "password")
-DB_NAME = os.getenv("DB_NAME", "jobmatch")
+# The DATABASE_URL will be used for connection.
+# For local development, you can set DATABASE_URL in your .env file.
+# Example: DATABASE_URL=postgresql://user:password@host:port/dbname
 
 def hash_password(password):
     """Hash a password for storing"""
@@ -22,15 +18,12 @@ def hash_password(password):
 def create_admin_user(username, email, password):
     """Create a new admin user"""
     try:
-        # Connect to the database
-        conn = psycopg2.connect(
-            host=DB_HOST,
-            port=DB_PORT,
-            user=DB_USER,
-            password=DB_PASSWORD,
-            database=DB_NAME
-        )
-        
+        # Connect to the database using DATABASE_URL
+        database_url = os.environ.get("DATABASE_URL")
+        if not database_url:
+            print("Error: DATABASE_URL environment variable not set.")
+            return False
+        conn = psycopg2.connect(database_url)
         cursor = conn.cursor()
         
         # Hash the password

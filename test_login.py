@@ -3,15 +3,8 @@ import psycopg2
 import os
 from dotenv import load_dotenv
 
-# Load environment variables
+# Load environment variables (will pick up DATABASE_URL from .env for local testing)
 load_dotenv()
-
-# Database configuration
-DB_HOST = os.getenv("DB_HOST", "localhost")
-DB_PORT = os.getenv("DB_PORT", "5432")
-DB_USER = os.getenv("DB_USER", "postgres")
-DB_PASSWORD = os.getenv("DB_PASSWORD", "password")
-DB_NAME = os.getenv("DB_NAME", "jobmatch")
 
 def verify_password(stored_password, provided_password):
     """Verify a stored password against one provided by user"""
@@ -19,16 +12,14 @@ def verify_password(stored_password, provided_password):
 
 def test_admin_login(username, password):
     """Test admin login"""
+    conn = None  # Initialize conn to None for the finally block
+    cursor = None # Initialize cursor to None for the finally block
     try:
-        # Connect to the database
-        conn = psycopg2.connect(
-            host=DB_HOST,
-            port=DB_PORT,
-            user=DB_USER,
-            password=DB_PASSWORD,
-            database=DB_NAME
-        )
-        
+        database_url = os.environ.get("DATABASE_URL")
+        if not database_url:
+            print("Error: DATABASE_URL environment variable not set.")
+            return False
+        conn = psycopg2.connect(database_url)
         cursor = conn.cursor()
         
         # Get admin user
