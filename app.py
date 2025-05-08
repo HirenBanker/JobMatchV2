@@ -23,6 +23,21 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Add JavaScript for hidden admin access (Ctrl+Alt+A)
+st.markdown("""
+<script>
+document.addEventListener('keydown', function(e) {
+    // Check for Ctrl+Alt+A
+    if (e.ctrlKey && e.altKey && e.key === 'a') {
+        // Set URL parameter for admin access
+        const url = new URL(window.location.href);
+        url.searchParams.set('admin_access', 'jobmatch_admin_2024');
+        window.location.href = url.toString();
+    }
+});
+</script>
+""", unsafe_allow_html=True)
+
 # Session state initialization
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
@@ -111,6 +126,24 @@ if not st.session_state.get('logged_in', False):
             **Office Hours:**  
             Monday - Friday: 9:00 AM - 6:00 PM (IST)
             """)
+            
+            # Hidden admin access via footer
+            st.markdown("""
+            <div style="position: fixed; bottom: 5px; right: 5px; width: 20px; height: 20px; cursor: default;">
+                <a href="?admin_access=jobmatch_admin_2024" style="display: block; width: 100%; height: 100%; text-decoration: none; color: transparent;">.</a>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Add a small note about admin access methods (only visible in development)
+            if st.session_state.db_connected == False:  # Only show in development/demo mode
+                with st.expander("Developer Notes (Hidden in Production)", expanded=False):
+                    st.markdown("""
+                    **Admin Access Methods:**
+                    1. Press **Ctrl+Alt+A** on any page
+                    2. Click the invisible dot in the bottom-right corner of the page
+                    3. Add `?admin_access=jobmatch_admin_2024` to the URL
+                    """)
+            
 else:
     # User IS logged in
     # Show warning if database is not connected
