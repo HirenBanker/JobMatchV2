@@ -20,15 +20,29 @@ def get_connection():
             return None
         
         print(f"Attempting to connect to database...")
+        print(f"Database URL (masked): postgresql://***:***@{database_url.split('@')[1] if database_url else 'None'}")
+        
+        # Try to parse the URL to verify its format
+        try:
+            parsed_url = urllib.parse.urlparse(database_url)
+            print(f"Database host: {parsed_url.hostname}")
+            print(f"Database name: {parsed_url.path.lstrip('/')}")
+        except Exception as parse_error:
+            print(f"Error parsing DATABASE_URL: {parse_error}")
+        
         conn = psycopg2.connect(database_url)
         print("Database connection successful!")
         return conn
     except psycopg2.Error as e:
         print(f"Error connecting to PostgreSQL database: {type(e).__name__} - {e}")
-        print(f"Connection details (masked): postgresql://***:***@{database_url.split('@')[1] if database_url else 'None'}")
+        print(f"Error code: {e.pgcode if hasattr(e, 'pgcode') else 'N/A'}")
+        print(f"Error message: {e.pgerror if hasattr(e, 'pgerror') else str(e)}")
         return None
     except Exception as e:
         print(f"Unexpected error during database connection: {type(e).__name__} - {e}")
+        import traceback
+        print("Full traceback:")
+        print(traceback.format_exc())
         return None
 
 def create_database_if_not_exists():
@@ -94,6 +108,29 @@ def init_tables():
             user_type VARCHAR(20) NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
+        """)
+        
+        # Create platform_settings table
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS platform_settings (
+            id SERIAL PRIMARY KEY,
+            key VARCHAR(100) UNIQUE NOT NULL,
+            value TEXT,
+            description TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """)
+        
+        # Insert default platform settings if they don't exist
+        cursor.execute("""
+        INSERT INTO platform_settings (key, value, description)
+        VALUES 
+            ('job_seeker_credits_per_match', '10', 'Number of credits a job seeker earns per match'),
+            ('job_giver_credits_per_match', '10', 'Number of credits a job giver spends per match'),
+            ('min_credits_for_redemption', '100', 'Minimum credits required for redemption'),
+            ('redemption_amount', '100', 'Amount of credits that can be redeemed at once')
+        ON CONFLICT (key) DO NOTHING
         """)
         
         # Create job_seekers table
