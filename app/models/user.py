@@ -26,14 +26,18 @@ class User:
     @staticmethod
     def create(username, email, password, user_type):
         """Create a new user"""
+        print(f"Starting user creation for username: {username}")
         conn = get_connection()
         if conn is None:
+            print("Failed to get database connection during user creation")
             return None
         
         try:
             cursor = conn.cursor()
+            print("Creating password hash...")
             password_hash = User.hash_password(password)
             
+            print("Inserting user into database...")
             cursor.execute(
                 """
                 INSERT INTO users (username, email, password_hash, user_type)
@@ -44,9 +48,11 @@ class User:
             )
             
             user_id, created_at = cursor.fetchone()
+            print(f"User created with ID: {user_id}")
             conn.commit()
             
             # Create corresponding profile based on user type
+            print(f"Creating {user_type} profile...")
             if user_type == 'job_seeker':
                 cursor.execute(
                     """
@@ -65,6 +71,7 @@ class User:
                 )
             
             conn.commit()
+            print(f"Profile creation successful for {user_type}")
             
             return User(
                 id=user_id,
@@ -76,19 +83,27 @@ class User:
             )
         except psycopg2.Error as e:
             conn.rollback()
-            print(f"DATABASE ERROR in User.create for {username}: {type(e).__name__} - {e}")
+            print(f"DATABASE ERROR in User.create for {username}:")
+            print(f"Error type: {type(e).__name__}")
+            print(f"Error message: {e}")
+            print(f"Error code: {e.pgcode if hasattr(e, 'pgcode') else 'N/A'}")
             import traceback
+            print("Full traceback:")
             print(traceback.format_exc())
             return None
-        except Exception as ex: # Catch any other unexpected error during user creation
+        except Exception as ex:
             conn.rollback()
-            print(f"UNEXPECTED ERROR in User.create for {username}: {type(ex).__name__} - {ex}")
+            print(f"UNEXPECTED ERROR in User.create for {username}:")
+            print(f"Error type: {type(ex).__name__}")
+            print(f"Error message: {ex}")
             import traceback
+            print("Full traceback:")
             print(traceback.format_exc())
             return None
         finally:
             cursor.close()
             conn.close()
+            print("Database connection closed")
     
     @staticmethod
     def get_by_username(username):

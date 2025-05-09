@@ -17,13 +17,18 @@ def get_connection():
         database_url = os.environ.get("DATABASE_URL")
         if not database_url:
             print("Error: DATABASE_URL environment variable not set.")
-            # In a Streamlit app, you might want to st.error or raise an exception
-            # For now, returning None is consistent with original behavior on error.
             return None
+        
+        print(f"Attempting to connect to database...")
         conn = psycopg2.connect(database_url)
+        print("Database connection successful!")
         return conn
     except psycopg2.Error as e:
-        print(f"Error connecting to PostgreSQL database: {e}")
+        print(f"Error connecting to PostgreSQL database: {type(e).__name__} - {e}")
+        print(f"Connection details (masked): postgresql://***:***@{database_url.split('@')[1] if database_url else 'None'}")
+        return None
+    except Exception as e:
+        print(f"Unexpected error during database connection: {type(e).__name__} - {e}")
         return None
 
 def create_database_if_not_exists():
