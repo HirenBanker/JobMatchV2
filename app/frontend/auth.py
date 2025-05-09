@@ -1,5 +1,6 @@
 import streamlit as st
 from app.models.user import User
+from app.database.connection import get_connection
 
 def handle_auth_flow():
     """Manages and displays the current authentication view."""
