@@ -73,7 +73,7 @@ def login_page():
     # Add admin account creation section
     st.markdown("---")
     with st.expander("Admin Account Creation", expanded=False):
-        st.write("Create an admin account (only if no admin exists)")
+        st.write("Create an admin account")
         
         admin_username = st.text_input("Admin Username", key="admin_username")
         admin_email = st.text_input("Admin Email", key="admin_email")
@@ -89,7 +89,7 @@ def login_page():
                 st.error("Passwords do not match")
                 return
             
-            # Check if any admin exists
+            # Check if username already exists
             conn = get_connection()
             if conn is None:
                 st.error("Database connection failed")
@@ -97,11 +97,9 @@ def login_page():
                 
             try:
                 cursor = conn.cursor()
-                cursor.execute("SELECT 1 FROM users WHERE user_type = 'admin' LIMIT 1")
-                admin_exists = cursor.fetchone() is not None
-                
-                if admin_exists:
-                    st.error("An admin account already exists")
+                cursor.execute("SELECT 1 FROM users WHERE username = %s", (admin_username,))
+                if cursor.fetchone():
+                    st.error("Username already exists. Please choose a different username.")
                     return
                 
                 # Create admin account
