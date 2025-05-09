@@ -1,4 +1,5 @@
 import streamlit as st
+import os
 from app.frontend.admin import admin_dashboard
 from app.frontend.admin_auth import admin_login_page
 from app.frontend.job_seeker import job_seeker_dashboard
@@ -22,6 +23,11 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# Function to get the correct path for static files
+def get_image_path(image_name):
+    base_path = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(base_path, "assets", "images", image_name)
 
 # Add JavaScript for hidden admin access (Ctrl+Alt+A)
 st.markdown("""
@@ -93,8 +99,7 @@ if not st.session_state.get('logged_in', False):
             
             col1_about, col2_about = st.columns(2)
             with col1_about:
-                # You can replace these placeholders with actual image paths or URLs
-                st.image("assets/images/our_vision.png", caption="Our Vision")
+                st.image(get_image_path("our_vision.png"), caption="Our Vision")
                 st.subheader("Our Vision")
                 st.markdown("""
                 To be the leading job matching platform, recognized for innovation, user satisfaction, 
@@ -103,7 +108,7 @@ if not st.session_state.get('logged_in', False):
                 """)
 
             with col2_about:
-                st.image("assets/images/our_technology.png", caption="Our Technology")
+                st.image(get_image_path("our_technology.png"), caption="Our Technology")
                 st.subheader("Our Technology")
                 st.markdown("""
                 JobMatch leverages modern technology to provide a smart, fast, and reliable experience. 
@@ -112,7 +117,7 @@ if not st.session_state.get('logged_in', False):
 
         with tab3:
             st.header("Contact Us")
-            st.image("assets/images/Contact_us.png", caption="We're here to help!")
+            st.image(get_image_path("Contact_us.png"), caption="We're here to help!")
             st.subheader("Get in Touch")
             st.markdown("""
             We value your feedback and are here to assist you with any inquiries.
