@@ -82,8 +82,8 @@ if not st.session_state.get('logged_in', False):
             
             st.subheader("How It Works")
             st.markdown("""
-            - **Job Seekers:** Create detailed profiles, upload CVs, and swipe through relevant job listings.
-            - **Recruiters:** Post job openings, search for qualified candidates using advanced filters, and swipe on profiles.
+            - **Job Seekers:** Create catchy profiles - 80/20 rule: 80% about core work experience, 20% ancilliary experience
+            - **Recruiters:** Create pointy job profiles - 80/20 rule : 80% about routine work, 20% about learning and growth the role offers
             - **Mutual Interest:** When both a job seeker and a recruiter express interest (swipe right), it's a match!
             - **Connect:** Matched parties can view full profiles and contact information to take the next steps.
             - **Credit System:** Recruiters use credits for actions like posting jobs and viewing full match details. Job seekers earn credits upon successful matches, which can be redeemed.
