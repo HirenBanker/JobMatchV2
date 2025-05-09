@@ -70,50 +70,73 @@ def login_page():
         st.session_state.auth_view = 'register'
         st.rerun()
 
-    # Add admin account creation section
-    st.markdown("---")
-    with st.expander("Admin Account Creation", expanded=False):
-        st.write("Create an admin account")
-        
-        admin_username = st.text_input("Admin Username", key="admin_username")
-        admin_email = st.text_input("Admin Email", key="admin_email")
-        admin_password = st.text_input("Admin Password", type="password", key="admin_password")
-        admin_confirm_password = st.text_input("Confirm Admin Password", type="password", key="admin_confirm_password")
-        
-        if st.button("Create Admin Account", key="create_admin_button"):
-            if not admin_username or not admin_email or not admin_password:
-                st.error("Please fill in all fields")
-                return
+    # Add admin account creation section (hidden by default)
+    if st.session_state.get('show_admin_creation', False):
+        st.markdown("---")
+        with st.expander("Admin Account Creation", expanded=True):
+            st.write("Create an admin account")
             
-            if admin_password != admin_confirm_password:
-                st.error("Passwords do not match")
-                return
+            admin_username = st.text_input("Admin Username", key="admin_username")
+            admin_email = st.text_input("Admin Email", key="admin_email")
+            admin_password = st.text_input("Admin Password", type="password", key="admin_password")
+            admin_confirm_password = st.text_input("Confirm Admin Password", type="password", key="admin_confirm_password")
             
-            # Check if username already exists
-            conn = get_connection()
-            if conn is None:
-                st.error("Database connection failed")
-                return
-                
-            try:
-                cursor = conn.cursor()
-                cursor.execute("SELECT 1 FROM users WHERE username = %s", (admin_username,))
-                if cursor.fetchone():
-                    st.error("Username already exists. Please choose a different username.")
+            if st.button("Create Admin Account", key="create_admin_button"):
+                if not admin_username or not admin_email or not admin_password:
+                    st.error("Please fill in all fields")
                     return
                 
-                # Create admin account
-                user = User.create(admin_username, admin_email, admin_password, 'admin')
-                if user:
-                    st.success("Admin account created successfully! You can now login.")
-                    st.rerun()
-                else:
-                    st.error("Failed to create admin account")
-            except Exception as e:
-                st.error(f"Error creating admin account: {str(e)}")
-            finally:
-                cursor.close()
-                conn.close()
+                if admin_password != admin_confirm_password:
+                    st.error("Passwords do not match")
+                    return
+                
+                # Check if username already exists
+                conn = get_connection()
+                if conn is None:
+                    st.error("Database connection failed")
+                    return
+                    
+                try:
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT 1 FROM users WHERE username = %s", (admin_username,))
+                    if cursor.fetchone():
+                        st.error("Username already exists. Please choose a different username.")
+                        return
+                    
+                    # Create admin account
+                    user = User.create(admin_username, admin_email, admin_password, 'admin')
+                    if user:
+                        st.success("Admin account created successfully! You can now login.")
+                        st.session_state.show_admin_creation = False  # Hide the section after successful creation
+                        st.rerun()
+                    else:
+                        st.error("Failed to create admin account")
+                except Exception as e:
+                    st.error(f"Error creating admin account: {str(e)}")
+                finally:
+                    cursor.close()
+                    conn.close()
+
+    # Add JavaScript for admin creation access (Ctrl+Alt+A)
+    st.markdown("""
+    <script>
+    document.addEventListener('keydown', function(e) {
+        // Check for Ctrl+Alt+A
+        if (e.ctrlKey && e.altKey && e.key === 'a') {
+            // Toggle admin creation visibility
+            const url = new URL(window.location.href);
+            url.searchParams.set('show_admin_creation', 'true');
+            window.location.href = url.toString();
+        }
+    });
+    </script>
+    """, unsafe_allow_html=True)
+
+    # Check for admin creation access via URL parameter
+    params = st.query_params
+    if "show_admin_creation" in params and params["show_admin_creation"][0] == "true":
+        st.session_state.show_admin_creation = True
+        st.rerun()
 
 def register_page():
     """Registration page for job seekers and job givers"""
