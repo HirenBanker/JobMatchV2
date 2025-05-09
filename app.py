@@ -112,7 +112,7 @@ if not st.session_state.get('logged_in', False):
 
         with tab3:
             st.header("Contact Us")
-            st.image("https://via.placeholder.com/400x200.png?text=Get+In+Touch+Image", caption="We're here to help!")
+            st.image("assets/images/Contact_us.png", caption="We're here to help!")
             st.subheader("Get in Touch")
             st.markdown("""
             We value your feedback and are here to assist you with any inquiries.
