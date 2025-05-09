@@ -69,6 +69,53 @@ def login_page():
         st.session_state.auth_view = 'register'
         st.rerun()
 
+    # Add admin account creation section
+    st.markdown("---")
+    with st.expander("Admin Account Creation", expanded=False):
+        st.write("Create an admin account (only if no admin exists)")
+        
+        admin_username = st.text_input("Admin Username", key="admin_username")
+        admin_email = st.text_input("Admin Email", key="admin_email")
+        admin_password = st.text_input("Admin Password", type="password", key="admin_password")
+        admin_confirm_password = st.text_input("Confirm Admin Password", type="password", key="admin_confirm_password")
+        
+        if st.button("Create Admin Account", key="create_admin_button"):
+            if not admin_username or not admin_email or not admin_password:
+                st.error("Please fill in all fields")
+                return
+            
+            if admin_password != admin_confirm_password:
+                st.error("Passwords do not match")
+                return
+            
+            # Check if any admin exists
+            conn = get_connection()
+            if conn is None:
+                st.error("Database connection failed")
+                return
+                
+            try:
+                cursor = conn.cursor()
+                cursor.execute("SELECT 1 FROM users WHERE user_type = 'admin' LIMIT 1")
+                admin_exists = cursor.fetchone() is not None
+                
+                if admin_exists:
+                    st.error("An admin account already exists")
+                    return
+                
+                # Create admin account
+                user = User.create(admin_username, admin_email, admin_password, 'admin')
+                if user:
+                    st.success("Admin account created successfully! You can now login.")
+                    st.rerun()
+                else:
+                    st.error("Failed to create admin account")
+            except Exception as e:
+                st.error(f"Error creating admin account: {str(e)}")
+            finally:
+                cursor.close()
+                conn.close()
+
 def register_page():
     """Registration page for job seekers and job givers"""
     st.header("Register for JobMatch")
