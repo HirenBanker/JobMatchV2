@@ -96,11 +96,13 @@ class Job:
     @staticmethod
     def get_by_job_giver_id(job_giver_id):
         """Get all jobs for a job giver"""
-        conn = get_connection()
-        if conn is None:
-            return []
-        
+        conn = None
         try:
+            conn = get_connection()
+            if conn is None:
+                print("Failed to get database connection")
+                return []
+
             cursor = conn.cursor()
             cursor.execute(
                 """
@@ -129,12 +131,14 @@ class Job:
                 ))
             
             return jobs
-        except psycopg2.Error as e:
-            print(f"Error getting jobs: {e}")
+        except Exception as e:
+            print(f"Error getting jobs for job giver {job_giver_id}: {e}")
             return []
         finally:
-            cursor.close()
-            conn.close()
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
     
     @staticmethod
     def get_all_for_swiping(job_seeker_id, limit=10, keywords=None, location=None, job_type=None, min_salary=None, max_salary=None):

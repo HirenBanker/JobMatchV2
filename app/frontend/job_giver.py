@@ -137,16 +137,16 @@ def jobs_section(job_giver):
     """Jobs management section for job givers"""
     st.title("My Job Listings")
     
-    # Validate job giver object
+    # Validate job giver object and session state
     if not job_giver or not job_giver.id:
         st.error("Unable to load your profile. Please try refreshing the page.")
         if st.button("Refresh Page"):
-            st.session_state.job_giver_current_page = "Profile"
+            # Don't reset the current page, just reload the job giver object
+            st.session_state.job_giver_initialized = False
             st.rerun()
         return
     
     # Check if job giver has enough credits to post a job
-    # TODO: Replace '1' with a dynamically fetched job_post_cost from platform settings
     if job_giver.credits < 1: 
         st.warning("You need at least 1 credit to post a job. Please purchase credits.")
         if st.button("Go to Credits", on_click=set_navigation_target_page, args=("Credits",), key="credits_button_jobs"):
@@ -156,13 +156,12 @@ def jobs_section(job_giver):
     # Get existing jobs
     try:
         jobs = Job.get_by_job_giver_id(job_giver.id)
+        if jobs is None:  # Handle case where get_by_job_giver_id returns None
+            st.error("Error loading your jobs. Please try again.")
+            return
     except Exception as e:
         st.error("Error loading your jobs. Please try again.")
         print(f"Error loading jobs: {e}")
-        # Reset to Profile page on error
-        st.session_state.job_giver_current_page = "Profile"
-        if st.button("Return to Profile"):
-            st.rerun()
         return
     
     # Create tabs for job management and applicants
@@ -247,51 +246,19 @@ def jobs_section(job_giver):
                     # Toggle active status
                     if job.active:
                         if st.button(f"Deactivate Job", key=f"deactivate_{job.id}"):
-                            job.deactivate()
-                            st.success("Job deactivated")
-                            st.rerun()
+                            if job.deactivate():
+                                st.success("Job deactivated successfully!")
+                                st.rerun()
+                            else:
+                                st.error("Failed to deactivate job. Please try again.")
                     else:
                         if st.button(f"Activate Job", key=f"activate_{job.id}"):
                             job.active = True
-                            job.update()
-                            st.success("Job activated")
-                            st.rerun()
-                    
-                    # Add a delete button within a form for confirmation
-                    with st.form(key=f"delete_job_form_{job.id}"):
-                        st.warning("Deleting this job is permanent and cannot be undone. All related matches and swipes will also be removed.")
-                        confirm_delete = st.checkbox("Confirm permanent deletion", key=f"confirm_delete_{job.id}")
-                        submitted = st.form_submit_button("Delete Job Permanently")
-                        
-                        if submitted:
-                            if confirm_delete:
-                                conn = get_connection()
-                                if conn:
-                                    try:
-                                        cursor = conn.cursor()
-                                        st.write("Deleting related data...") # Feedback
-                                        # Delete related matches
-                                        cursor.execute("DELETE FROM matches WHERE job_id = %s", (job.id,))
-                                        # Delete related swipes (job as target)
-                                        cursor.execute("DELETE FROM swipes WHERE target_type = 'job' AND target_id = %s", (job.id,))
-                                        # Delete the job itself
-                                        st.write("Deleting job...") # Feedback
-                                        cursor.execute("DELETE FROM jobs WHERE id = %s AND job_giver_id = %s", (job.id, job_giver.id)) # Ensure only owner can delete
-                                        
-                                        conn.commit()
-                                        st.success(f"Job '{job.title}' deleted successfully.")
-                                        st.rerun()
-                                    except Exception as delete_error:
-                                        conn.rollback()
-                                        st.error(f"Error deleting job '{job.title}':")
-                                        st.exception(delete_error)
-                                    finally:
-                                        cursor.close()
-                                        conn.close()
-                                else:
-                                    st.error("Database connection failed.")
+                            if job.update():
+                                st.success("Job activated successfully!")
+                                st.rerun()
                             else:
-                                st.warning("Please check the confirmation box to delete.")
+                                st.error("Failed to activate job. Please try again.")
         else:
             st.info("You haven't posted any jobs yet.")
     
