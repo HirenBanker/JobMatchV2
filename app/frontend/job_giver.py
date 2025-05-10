@@ -25,15 +25,20 @@ def job_giver_dashboard():
 
     # Get job giver profile if not already initialized
     if not st.session_state.job_giver_initialized:
-        job_giver = JobGiver.get_by_user_id(st.session_state.user_id)
-        if job_giver:
-            st.session_state.job_giver_object = job_giver
-            st.session_state.job_giver_initialized = True
-        else:
-            st.error("Unable to load your profile. Please try refreshing the page.")
-            if st.button("Refresh Page"):
-                st.session_state.job_giver_initialized = False
-                st.rerun()
+        try:
+            job_giver = JobGiver.get_by_user_id(st.session_state.user_id)
+            if job_giver:
+                st.session_state.job_giver_object = job_giver
+                st.session_state.job_giver_initialized = True
+            else:
+                st.error("Unable to load your profile. Please try refreshing the page.")
+                if st.button("Refresh Page"):
+                    st.session_state.job_giver_initialized = False
+                    st.rerun()
+                return
+        except Exception as e:
+            print(f"Error loading job giver profile: {e}")
+            st.error("An error occurred while loading your profile. Please try again.")
             return
     else:
         job_giver = st.session_state.job_giver_object
@@ -79,9 +84,8 @@ def job_giver_dashboard():
     except Exception as e:
         st.error("An error occurred while loading the page. Please try again.")
         print(f"Error in job_giver_dashboard: {e}")
-        # Reset to Profile page on error
-        st.session_state.job_giver_current_page = "Profile"
-        st.rerun()
+        # Don't reset the current page on error, just show the error
+        st.stop()
 
 def profile_section(job_giver):
     """Profile management section for job givers"""

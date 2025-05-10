@@ -17,6 +17,7 @@ class JobGiver:
     def get_by_user_id(user_id):
         """Get a job giver by user ID"""
         conn = None
+        cursor = None
         try:
             conn = get_connection()
             if conn is None:
@@ -32,7 +33,6 @@ class JobGiver:
             """, (user_id,))
             
             result = cursor.fetchone()
-            cursor.close()
             
             if result:
                 return JobGiver(
@@ -47,9 +47,11 @@ class JobGiver:
                 )
             return None
         except Exception as e:
-            print(f"Error getting job giver by user ID: {e}")
+            print(f"Error getting job giver by user ID {user_id}: {e}")
             return None
         finally:
+            if cursor:
+                cursor.close()
             if conn:
                 conn.close()
     
