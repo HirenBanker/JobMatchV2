@@ -205,8 +205,24 @@ def jobs_section(job_giver):
         st.rerun()
         return
         
-    st.title("My Job Listings")
-    
+    # --- Simplified content for debugging ---
+    st.title("My Job Listings (Simplified for Debugging)")
+    print("JOBS_SECTION_DEBUG: Entered simplified jobs_section.")
+
+    # If job_giver is None, get it directly from the database
+    if not job_giver:
+        print("JOBS_SECTION_WARN: job_giver object is None in simplified section.")
+        st.error("Job giver profile not loaded.") # Should not happen if dashboard logic is correct
+        return
+
+    st.write(f"Job Giver: {job_giver.company_name}")
+    st.write("This is a simplified version of the jobs section for debugging the 'Stopping...' issue.")
+    st.success("Simplified jobs section rendered successfully.")
+    print("JOBS_SECTION_DEBUG: Exiting simplified jobs_section.")
+    return # End of simplified section
+    # --- End of simplified content ---
+
+    # Original content starts below (effectively commented out by the return above)
     # If job_giver is None, get it directly from the database
     if not job_giver:
         print("JOBS_SECTION_WARN: job_giver object is None, attempting to reload.")
