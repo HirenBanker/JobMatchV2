@@ -15,8 +15,26 @@ def set_navigation_target_page(target_page_title):
 
 def job_giver_dashboard():
     """Dashboard for job givers (recruiters)"""
-    # Get job giver profile
-    job_giver = JobGiver.get_by_user_id(st.session_state.user_id)
+    # Initialize session state variables if they don't exist
+    if 'job_giver_initialized' not in st.session_state:
+        st.session_state.job_giver_initialized = False
+        st.session_state.job_giver_object = None
+        st.session_state.job_giver_current_page = "Profile"
+
+    # Get job giver profile if not already initialized
+    if not st.session_state.job_giver_initialized:
+        job_giver = JobGiver.get_by_user_id(st.session_state.user_id)
+        if job_giver:
+            st.session_state.job_giver_object = job_giver
+            st.session_state.job_giver_initialized = True
+        else:
+            st.error("Unable to load your profile. Please try refreshing the page.")
+            if st.button("Refresh Page"):
+                st.session_state.job_giver_initialized = False
+                st.rerun()
+            return
+    else:
+        job_giver = st.session_state.job_giver_object
 
     # Debug info
     print(f"Job Giver Dashboard - User ID: {st.session_state.user_id}")
@@ -25,22 +43,16 @@ def job_giver_dashboard():
 
     menu_options = ["Profile", "My Jobs", "Find Candidates", "My Matches", "Credits"]
 
-    # Initialize the current page in session state if it doesn't exist
-    if 'job_giver_current_page' not in st.session_state:
-        st.session_state.job_giver_current_page = "Profile"  # Default to Profile page
-
     # Handle programmatic navigation triggered by button clicks
     if st.session_state.get("navigate_to_page_title"):
-        # Update the session state variable that the radio button uses for its key.
-        # This happens *before* the radio button is instantiated in this script run.
         st.session_state.job_giver_current_page = st.session_state.navigate_to_page_title
-        del st.session_state.navigate_to_page_title  # Consume the navigation trigger
+        del st.session_state.navigate_to_page_title
 
     # Sidebar menu
     menu = st.sidebar.radio(
         "Menu",
         menu_options,
-        key="job_giver_current_page"  # This session state variable will hold the selected menu string
+        key="job_giver_current_page"
     )
 
     # Check if profile is complete
