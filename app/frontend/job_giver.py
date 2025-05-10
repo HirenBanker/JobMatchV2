@@ -294,50 +294,8 @@ def jobs_section(job_giver):
     else:
         st.info("You haven't posted any jobs yet.")
 
-    print("JOBS_SECTION_DEBUG: Finished displaying existing jobs.")
+    print("JOBS_SECTION_DEBUG: Finished displaying existing jobs (initial display before tabs).")
 
-    # --- Reintroduce "Add New Job" form ---
-    st.markdown("---")
-    with st.expander("Add New Job"):
-        with st.form("new_job_form"):
-            job_title = st.text_input("Job Title", key="job_title")
-            
-            col1_form, col2_form = st.columns(2)
-            with col1_form:
-                job_location = st.text_input("Job Location", key="job_location")
-            with col2_form:
-                job_type = st.selectbox("Job Type", 
-                                       ["Full-time", "Part-time", "Contract", "Internship", "Remote"],
-                                       key="job_type")
-            
-            salary_range = st.text_input("Salary Range (e.g., $50,000 - $70,000)", key="salary_range")
-            
-            job_description = st.text_area("Job Description", height=150, key="job_description")
-            
-            # Requirements input (one per line)
-            requirements_text = st.text_area("Requirements (one per line)", height=100, key="requirements_text")
-            
-            submit_button = st.form_submit_button("Post Job")
-            
-            if submit_button:
-                if not job_title or not job_description:
-                    st.error("Job title and description are required")
-                else:
-                    requirements_list = [req.strip() for req in requirements_text.split("\n") if req.strip()]
-                    new_job = Job(
-                        job_giver_id=job_giver.id, title=job_title, description=job_description,
-                        requirements=requirements_list, location=job_location,
-                        salary_range=salary_range, job_type=job_type
-                    )
-                    if new_job.create():
-                        st.success("Job posted successfully!")
-                        st.rerun() # Rerun to show the new job in the list
-                    else:
-                        st.error("Failed to post job. Please try again.")
-    print("JOBS_SECTION_DEBUG: Finished 'Add New Job' form section.")
-    return # Keep the "View Applicants" tab and other original content commented out for now
-
-    # --- Original more complex content below (still commented out) ---
     # Create tabs for job management and applicants
     tab1, tab2 = st.tabs(["Manage Jobs", "View Applicants"])
     
@@ -345,20 +303,20 @@ def jobs_section(job_giver):
     with tab1:
         # Add new job form
         with st.expander("Add New Job"):
-            with st.form("new_job_form"):
-                job_title = st.text_input("Job Title", key="job_title")
+            with st.form("new_job_form_tab"): # Changed key to avoid conflict if old form is somehow cached
+                job_title_tab = st.text_input("Job Title", key="job_title_tab")
                 
-                col1, col2 = st.columns(2)
-                with col1:
-                    job_location = st.text_input("Job Location", key="job_location")
-                with col2:
-                    job_type = st.selectbox("Job Type", 
+                col1_tab, col2_tab = st.columns(2)
+                with col1_tab:
+                    job_location_tab = st.text_input("Job Location", key="job_location_tab")
+                with col2_tab:
+                    job_type_tab = st.selectbox("Job Type", 
                                            ["Full-time", "Part-time", "Contract", "Internship", "Remote"],
-                                           key="job_type")
+                                           key="job_type_tab")
                 
-                salary_range = st.text_input("Salary Range (e.g., $50,000 - $70,000)", key="salary_range")
+                salary_range_tab = st.text_input("Salary Range (e.g., $50,000 - $70,000)", key="salary_range_tab")
                 
-                job_description = st.text_area("Job Description", height=150, key="job_description")
+                job_description_tab = st.text_area("Job Description", height=150, key="job_description_tab")
                 
                 # Requirements input (one per line)
                 requirements_text = st.text_area("Requirements (one per line)", height=100, key="requirements_text")
@@ -367,35 +325,34 @@ def jobs_section(job_giver):
                 
                 if submit_button:
                     # Validate inputs
-                    if not job_title or not job_description:
+                    if not job_title_tab or not job_description_tab:
                         st.error("Job title and description are required")
-                        return
+                    else: # Added else to prevent further execution on error
+                        # Process requirements (split by newline and strip whitespace)
+                        requirements = [req.strip() for req in requirements_text.split("\n") if req.strip()]
+                        
+                        # Create job object
+                        job = Job(
+                            job_giver_id=job_giver.id,
+                            title=job_title_tab,
+                            description=job_description_tab,
+                            requirements=requirements,
+                            location=job_location_tab,
+                            salary_range=salary_range_tab,
+                            job_type=job_type_tab
+                        )
                     
-                    # Process requirements (split by newline and strip whitespace)
-                    requirements = [req.strip() for req in requirements_text.split("\n") if req.strip()]
-                    
-                    # Create job object
-                    job = Job(
-                        job_giver_id=job_giver.id,
-                        title=job_title,
-                        description=job_description,
-                        requirements=requirements,
-                        location=job_location,
-                        salary_range=salary_range,
-                        job_type=job_type
-                    )
-                    
-                    # Save to database
-                    if job.create():
-                        # Deduct credit
-                        success, message = job_giver.use_credit()
-                        if success:
-                            st.success("Job posted successfully!")
-                            st.rerun()
+                        # Save to database
+                        if job.create():
+                            # Deduct credit
+                            success, message = job_giver.use_credit() # Assuming default cost or implement dynamic cost
+                            if success:
+                                st.success("Job posted successfully!")
+                                st.rerun()
+                            else:
+                                st.error(f"Failed to post job: {message}") # This might be credit issue
                         else:
-                            st.error(f"Failed to post job: {message}")
-                    else:
-                        st.error("Failed to post job. Please try again.")
+                            st.error("Failed to post job. Please try again.") # This is job.create() failure
         
         # Display existing jobs
         if jobs:
@@ -438,13 +395,14 @@ def jobs_section(job_giver):
     
     # Tab 2: View Applicants
     with tab2:
+        st.subheader("View Applicants")
         if not jobs:
-            st.info("You haven't posted any jobs yet.")
+            st.info("You haven't posted any jobs yet, or no jobs are available to view applicants for.")
         else:
             # Create a dropdown to select a job
             job_titles = [f"{job.title} (ID: {job.id})" for job in jobs]
-            selected_job_title = st.selectbox("Select a job to view applicants", job_titles)
-            
+            selected_job_title = st.selectbox("Select a job to view applicants", 
+                                              job_titles, key="va_selected_job_title") # Added key
             if selected_job_title:
                 # Extract job ID from the selected title
                 selected_job_id = int(selected_job_title.split("ID: ")[1].split(")")[0])
@@ -571,9 +529,10 @@ def jobs_section(job_giver):
                                         else:
                                             st.error(f"Failed to express interest: {swipe_message}")
                     else:
-                        st.info("No applicant details to display in table.") # Should be caught by outer if
-                else:
-                    st.info("No candidates have expressed interest in this job yet.")
+                        st.info("No applicant details to display in table.") 
+                # else:
+                #     st.info("No candidates have expressed interest in this job yet.")
+    print("JOBS_SECTION_DEBUG: Finished rendering tabs in jobs_section.")
 
 def candidates_section(job_giver):
     """Candidate swiping section for job givers"""
