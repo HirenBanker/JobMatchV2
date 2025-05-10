@@ -115,6 +115,13 @@ def jobs_section(job_giver):
     """Jobs management section for job givers"""
     st.title("My Job Listings")
     
+    # Validate job giver object
+    if not job_giver or not job_giver.id:
+        st.error("Unable to load your profile. Please try refreshing the page.")
+        if st.button("Refresh Page"):
+            st.rerun()
+        return
+    
     # Check if job giver has enough credits to post a job
     # TODO: Replace '1' with a dynamically fetched job_post_cost from platform settings
     if job_giver.credits < 1: 
@@ -123,7 +130,12 @@ def jobs_section(job_giver):
         return
     
     # Get existing jobs
-    jobs = Job.get_by_job_giver_id(job_giver.id)
+    try:
+        jobs = Job.get_by_job_giver_id(job_giver.id)
+    except Exception as e:
+        st.error("Error loading your jobs. Please try again.")
+        print(f"Error loading jobs: {e}")
+        return
     
     # Create tabs for job management and applicants
     tab1, tab2 = st.tabs(["Manage Jobs", "View Applicants"])
