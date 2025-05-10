@@ -159,11 +159,12 @@ def jobs_section(job_giver):
                 st.rerun()
             return
     
-    # Validate job giver ID
-    if not job_giver.id:
-        st.error("Invalid job giver profile. Please complete your profile first.")
-        st.session_state.job_giver_current_page = "Profile"
-        st.rerun()
+    # Check if profile is complete
+    if not job_giver.profile_complete or not job_giver.company_name:
+        st.warning("Please complete your profile first before managing jobs.")
+        if st.button("Go to Profile"):
+            st.session_state.job_giver_current_page = "Profile"
+            st.rerun()
         return
 
     # Check if job giver has enough credits to post a job
