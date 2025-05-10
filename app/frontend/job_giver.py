@@ -56,30 +56,27 @@ def job_giver_dashboard():
 
     menu_options = ["Profile", "My Jobs", "Find Candidates", "My Matches", "Credits"]
 
-    # Handle programmatic navigation triggered by button clicks
+    # Handle programmatic navigation (e.g., from buttons in other sections like "Go to Credits")
+    # This ensures st.session_state.job_giver_current_page is set *before* the radio button reads it.
     if st.session_state.get("navigate_to_page_title"):
         print(f"Navigating to: {st.session_state.navigate_to_page_title}")
         st.session_state.job_giver_current_page = st.session_state.navigate_to_page_title
         del st.session_state.navigate_to_page_title
 
-    # Use a simpler approach for the menu
-    # Get the current page index
-    current_page_index = menu_options.index(st.session_state.job_giver_current_page) if st.session_state.job_giver_current_page in menu_options else 0
-    
-    # Use the radio button with a simple key
-    menu = st.sidebar.radio(
+    # The radio button's state is directly managed by 'st.session_state.job_giver_current_page'.
+    # Streamlit updates this session state variable when the radio button is changed and reruns.
+    # The 'key' argument links the radio's state to this session state variable.
+    # The return value of st.sidebar.radio is the selected option, which will also be
+    # in st.session_state.job_giver_current_page after interaction.
+    st.sidebar.radio(
         "Menu",
         menu_options,
-        index=current_page_index,
-        key="job_giver_menu_radio"  # Explicit key added
+        key="job_giver_current_page" 
     )
     
-    # Update the current page in session state if it changed
-    if menu != st.session_state.job_giver_current_page:
-        print(f"Menu changed from {st.session_state.job_giver_current_page} to {menu}")
-        st.session_state.job_giver_current_page = menu
-        # Force a rerun to ensure the new page is loaded
-        st.rerun()
+    # The 'menu' variable for logic should now be read directly from session state,
+    # as the radio button directly updates it via its key.
+    menu = st.session_state.job_giver_current_page
     
     print(f"Current menu selection: {menu}")
 
