@@ -35,7 +35,7 @@ class JobGiver:
             result = cursor.fetchone()
             
             if result:
-                return JobGiver(
+                job_giver = JobGiver(
                     id=result[0],
                     user_id=result[1],
                     company_name=result[2],
@@ -45,15 +45,22 @@ class JobGiver:
                     credits=result[6],
                     profile_complete=result[7]
                 )
+                return job_giver
             return None
         except Exception as e:
             print(f"Error getting job giver by user ID {user_id}: {e}")
             return None
         finally:
             if cursor:
-                cursor.close()
+                try:
+                    cursor.close()
+                except Exception as e:
+                    print(f"Error closing cursor: {e}")
             if conn:
-                conn.close()
+                try:
+                    conn.close()
+                except Exception as e:
+                    print(f"Error closing connection: {e}")
     
     def update_profile(self):
         """Update job giver profile"""
