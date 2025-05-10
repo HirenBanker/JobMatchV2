@@ -205,27 +205,13 @@ def jobs_section(job_giver):
         st.rerun()
         return
         
-    # --- Simplified content for debugging ---
-    st.title("My Job Listings (Simplified for Debugging)")
-    print("JOBS_SECTION_DEBUG: Entered simplified jobs_section.")
+    st.title("My Job Listings")
+    print("JOBS_SECTION_DEBUG: Entered jobs_section.")
 
-    # If job_giver is None, get it directly from the database
-    if not job_giver:
-        print("JOBS_SECTION_WARN: job_giver object is None in simplified section.")
-        st.error("Job giver profile not loaded.") # Should not happen if dashboard logic is correct
-        return
-
-    st.write(f"Job Giver: {job_giver.company_name}")
-    st.write("This is a simplified version of the jobs section for debugging the 'Stopping...' issue.")
-    st.success("Simplified jobs section rendered successfully.")
-    print("JOBS_SECTION_DEBUG: Exiting simplified jobs_section.")
-    return # End of simplified section
-    # --- End of simplified content ---
-
-    # Original content starts below (effectively commented out by the return above)
     # If job_giver is None, get it directly from the database
     if not job_giver:
         print("JOBS_SECTION_WARN: job_giver object is None, attempting to reload.")
+        st.error("Job giver profile not loaded.") # Should not happen if dashboard logic is correct
         job_giver = JobGiver.get_by_user_id(user_id_in_section)
         
     # If we still don't have a job_giver, show an error
@@ -270,6 +256,48 @@ def jobs_section(job_giver):
         print(f"Error loading jobs: {e}")
         return
     
+    # Display existing jobs (simplified for now, no tabs or add new job form yet)
+    if jobs:
+        st.subheader("Your Current Job Listings")
+        for job in jobs:
+            with st.expander(f"{job.title} ({job.active and 'Active' or 'Inactive'})"):
+                st.write(f"**Posted:** {job.created_at.strftime('%Y-%m-%d')}")
+                st.write(f"**Location:** {job.location}")
+                
+                if job.salary_range:
+                    st.write(f"**Salary Range:** {job.salary_range}")
+                
+                st.write(f"**Job Type:** {job.job_type}")
+                
+                st.write("**Description:**")
+                st.write(job.description)
+                
+                if job.requirements:
+                    st.write("**Requirements:**")
+                    for req in job.requirements:
+                        st.write(f"- {req}")
+                
+                # Toggle active status (simplified, no immediate rerun for now to keep it minimal)
+                # if job.active:
+                #     if st.button(f"Deactivate Job", key=f"deactivate_{job.id}"):
+                #         if job.deactivate():
+                #             st.success("Job deactivated successfully! Refresh to see changes.")
+                #         else:
+                #             st.error("Failed to deactivate job.")
+                # else:
+                #     if st.button(f"Activate Job", key=f"activate_{job.id}"):
+                #         job.active = True
+                #         if job.update():
+                #             st.success("Job activated successfully! Refresh to see changes.")
+                #         else:
+                #             st.error("Failed to activate job.")
+    else:
+        st.info("You haven't posted any jobs yet.")
+
+    print("JOBS_SECTION_DEBUG: Finished displaying existing jobs (simplified).")
+    return # Keep the rest of the original function commented out for now
+
+    # --- Original more complex content below (still commented out) ---
     # Create tabs for job management and applicants
     tab1, tab2 = st.tabs(["Manage Jobs", "View Applicants"])
     
