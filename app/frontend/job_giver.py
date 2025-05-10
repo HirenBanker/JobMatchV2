@@ -15,132 +15,143 @@ def set_navigation_target_page(target_page_title):
 
 def job_giver_dashboard():
     """Dashboard for job givers (recruiters)"""
-    # Debug info - print all session state keys at the start
-    print("Session state keys at start of job_giver_dashboard:", list(st.session_state.keys()))
-    user_id_from_session = st.session_state.get('user_id')
-    print(f"job_giver_dashboard: user_id_from_session = {user_id_from_session} (type: {type(user_id_from_session)})")
-    print(f"Username in session: {st.session_state.get('username')}")
-    print(f"User type in session: {st.session_state.get('user_type')}")
-    
-    # Make sure we have a valid user_id in session state
-    if not user_id_from_session:
-        print("No user_id in session state - redirecting to login")
-        st.error("Session expired. Please log in again.")
+    # --- Stage 1: Very first check of user_id ---
+    user_id_at_entry = st.session_state.get('user_id')
+    print(f"JOB_GIVER_DASHBOARD_ENTRY: user_id = {user_id_at_entry}, type = {type(user_id_at_entry)}")
+    print(f"JOB_GIVER_DASHBOARD_ENTRY: all session keys = {list(st.session_state.keys())}")
+
+    if not user_id_at_entry:
+        print("JOB_GIVER_DASHBOARD_ERROR: user_id is None or empty at the very start. Logging out.")
+        st.error("Your session has expired or is invalid. Please log in again.")
+        # Minimal logout:
         st.session_state.logged_in = False
+        # No clearing of other keys here, let app.py handle full logout if needed on next run.
         st.rerun()
-        return
-        
-    # Initialize session state variables if they don't exist
+        return # Crucial return
+
+    # --- Stage 2: Initialize current page if needed ---
     if 'job_giver_current_page' not in st.session_state:
         st.session_state.job_giver_current_page = "Profile"
-        print("Initialized job_giver_current_page to Profile")
+        print("JOB_GIVER_DASHBOARD_INFO: Initialized job_giver_current_page to Profile")
 
-    # Get job giver profile directly from the database
-    job_giver = JobGiver.get_by_user_id(user_id_from_session)
-    
-    # If we couldn't get the job_giver, show an error
+    # --- Stage 3: Fetch JobGiver object ---
+    # This uses user_id_at_entry which we know is valid if we reached here
+    job_giver = JobGiver.get_by_user_id(user_id_at_entry)
     if not job_giver:
-        print("Failed to load job_giver from database")
-        st.error("Unable to load your profile. Please try refreshing the page.")
-        if st.button("Refresh Page"):
+        print(f"JOB_GIVER_DASHBOARD_ERROR: Failed to load JobGiver object for user_id {user_id_at_entry}. Displaying error.")
+        st.error("There was an issue loading your company profile. Please try refreshing or contact support if the issue persists.")
+        if st.button("Refresh Page", key="jg_refresh_no_profile"):
             st.rerun()
-        return
-        
-    # Debug info
-    print(f"Job Giver Dashboard - User ID from object: {job_giver.user_id}")
-    print(f"Job Giver ID: {job_giver.id}, Credits: {job_giver.credits}")
-    print(f"Current page: {st.session_state.job_giver_current_page}")
+        return # Crucial return
 
+    print(f"JOB_GIVER_DASHBOARD_INFO: Loaded JobGiver: id={job_giver.id}, user_id={job_giver.user_id}, company='{job_giver.company_name}'")
+
+    # --- Stage 4: Sidebar Menu and Navigation ---
     menu_options = ["Profile", "My Jobs", "Find Candidates", "My Matches", "Credits"]
-
-    # Handle programmatic navigation (e.g., from buttons in other sections like "Go to Credits")
-    # This ensures st.session_state.job_giver_current_page is set *before* the radio button reads it.
+    
+    # Handle programmatic navigation (e.g., from buttons in other sections)
     if st.session_state.get("navigate_to_page_title"):
-        print(f"Navigating to: {st.session_state.navigate_to_page_title}")
+        print(f"JOB_GIVER_DASHBOARD_NAV: Programmatic navigation to: {st.session_state.navigate_to_page_title}")
         st.session_state.job_giver_current_page = st.session_state.navigate_to_page_title
-        del st.session_state.navigate_to_page_title
+        del st.session_state.navigate_to_page_title # Clean up
 
-    # The radio button's state is directly managed by 'st.session_state.job_giver_current_page'.
-    # Streamlit updates this session state variable when the radio button is changed and reruns.
-    # The 'key' argument links the radio's state to this session state variable.
-    # The return value of st.sidebar.radio is the selected option, which will also be
-    # in st.session_state.job_giver_current_page after interaction.
+    # Sidebar radio button directly controls 'job_giver_current_page'
     st.sidebar.radio(
         "Menu",
         menu_options,
-        key="job_giver_current_page" 
+        key="job_giver_current_page"  # Streamlit updates this session state var and reruns
     )
     
-    # The 'menu' variable for logic should now be read directly from session state,
-    # as the radio button directly updates it via its key.
-    menu = st.session_state.job_giver_current_page
-    
-    print(f"Current menu selection: {menu}")
+    # The menu variable for logic is now directly from session state
+    current_menu_selection = st.session_state.job_giver_current_page
+    print(f"JOB_GIVER_DASHBOARD_INFO: Current menu selection from session state: {current_menu_selection}")
 
-    # Check if profile is complete
-    if not job_giver:
-        print("job_giver object is None when checking profile completeness")
-        st.error("Unable to load your profile. Please refresh the page.")
-        if st.button("Refresh Page"):
-            st.rerun()
-        return
-        
-    if not job_giver.profile_complete:
-        print(f"Profile is not complete. Current menu: {menu}")
-        if menu != "Profile":
-            st.warning("Please complete your profile first")
-            menu = "Profile"
-            st.session_state.job_giver_current_page = "Profile"
-            print("Redirected to Profile page due to incomplete profile")
+    # --- Stage 5: Check user_id AGAIN after sidebar interaction (for extreme debugging) ---
+    user_id_after_sidebar = st.session_state.get('user_id')
+    print(f"JOB_GIVER_DASHBOARD_POST_SIDEBAR: user_id = {user_id_after_sidebar}, type = {type(user_id_after_sidebar)}")
+    if not user_id_after_sidebar:
+        print("JOB_GIVER_DASHBOARD_CRITICAL_ERROR: user_id was LOST after sidebar rendering. This is highly unusual. Logging out.")
+        st.error("A critical session error occurred. Please log in again.")
+        st.session_state.logged_in = False
+        st.rerun()
+        return # Crucial return
     
-    # Display appropriate section based on menu selection
+    # --- Stage 6: Profile Completeness Check ---
+    # job_giver object should be valid here
+    if not job_giver.profile_complete:
+        print(f"JOB_GIVER_DASHBOARD_INFO: Profile not complete. Current menu: {current_menu_selection}")
+        if current_menu_selection != "Profile":
+            st.warning("Please complete your company profile first to access other features.")
+            # Force navigation to Profile page
+            st.session_state.job_giver_current_page = "Profile"
+            current_menu_selection = "Profile" # Update local var for current run
+            print("JOB_GIVER_DASHBOARD_REDIRECT: Redirecting to Profile page due to incomplete profile.")
+            # No st.rerun() here, let the script continue to render the Profile section this run.
+            # The radio button will update visually on the next implicit rerun if needed.
+
+    # --- Stage 7: Display Selected Section ---
+    print(f"JOB_GIVER_DASHBOARD_ROUTING: Displaying section for menu: {current_menu_selection}")
+    active_section_displayed = False
     try:
-        print(f"Displaying section for menu: {menu}")
-        if menu == "Profile":
+        if current_menu_selection == "Profile":
             profile_section(job_giver)
-        elif menu == "My Jobs":
-            print("About to call jobs_section")
+            active_section_displayed = True
+        elif current_menu_selection == "My Jobs":
+            print("JOB_GIVER_DASHBOARD_ROUTING: Calling jobs_section")
             jobs_section(job_giver)
-            print("Returned from jobs_section")
-        elif menu == "Find Candidates":
+            print("JOB_GIVER_DASHBOARD_ROUTING: Returned from jobs_section")
+            active_section_displayed = True
+        elif current_menu_selection == "Find Candidates":
             candidates_section(job_giver)
-        elif menu == "My Matches":
+            active_section_displayed = True
+        elif current_menu_selection == "My Matches":
             matches_section(job_giver)
-        elif menu == "Credits":
+            active_section_displayed = True
+        elif current_menu_selection == "Credits":
             credits_section(job_giver)
+            active_section_displayed = True
+        else:
+            # Fallback if job_giver_current_page is somehow invalid
+            print(f"JOB_GIVER_DASHBOARD_WARNING: Invalid menu selection '{current_menu_selection}'. Defaulting to Profile.")
+            st.session_state.job_giver_current_page = "Profile"
+            profile_section(job_giver) # Display profile as a safe default
+            active_section_displayed = True
+
     except Exception as e:
-        st.error("An error occurred while loading the page. Please try again.")
-        print(f"Error in job_giver_dashboard: {e}")
+        print(f"JOB_GIVER_DASHBOARD_EXCEPTION: Error rendering section '{current_menu_selection}': {e}")
         import traceback
         print("Full traceback:")
         print(traceback.format_exc())
-        # Don't reset the current page on error, just show the error
-        st.stop()
+        st.error(f"An error occurred while loading the '{current_menu_selection}' page. Please try again or select another menu item.")
+        # Optionally, could try to display a fallback or st.stop()
+        # If an error occurs in a section, we don't want to fall through and potentially cause more issues.
+        if not active_section_displayed: # If error happened before section could render
+             st.warning("Please try selecting another option from the menu.")
+        st.stop() # Stop further execution of this script run to prevent cascading errors
+
+    print(f"JOB_GIVER_DASHBOARD_END: Finished rendering for menu: {current_menu_selection}")
 
 def profile_section(job_giver):
     """Profile management section for job givers"""
-    st.title("Company Profile")
-    
-    # Make sure we have a valid user_id in session state
-    if not st.session_state.get('user_id'):
-        st.error("Session expired. Please log in again.")
-        # Clear session state to force re-login
-        for key in list(st.session_state.keys()):
-            del st.session_state[key]
+    user_id_in_section = st.session_state.get('user_id')
+    if not user_id_in_section:
+        print(f"SECTION_ERROR (profile_section): user_id missing. Logging out.")
+        st.error("Session error in section. Please log in again.")
+        st.session_state.logged_in = False
         st.rerun()
         return
     
-    # Initialize job giver if it doesn't exist
+    st.title("Company Profile")
+    
+    # Initialize job giver if it doesn't exist (should not happen if dashboard logic is correct)
     if not job_giver:
-        try:
-            job_giver = JobGiver.get_by_user_id(st.session_state.user_id)
-            if not job_giver:
-                # If we still can't get it, create a new instance
-                job_giver = JobGiver(user_id=st.session_state.user_id)
-        except Exception as e:
-            print(f"Error loading job giver profile in profile_section: {e}")
-            # Create a new instance as fallback
-            job_giver = JobGiver(user_id=st.session_state.user_id)
+        print("PROFILE_SECTION_WARN: job_giver object is None, attempting to reload.")
+        job_giver = JobGiver.get_by_user_id(user_id_in_section)
+        if not job_giver:
+            print("PROFILE_SECTION_ERROR: Failed to reload job_giver. Cannot display profile section.")
+            st.error("Critical error loading profile data.")
+            st.rerun()
+            return
     
     # Profile form
     with st.form("job_giver_profile_form"):
@@ -186,26 +197,20 @@ def profile_section(job_giver):
 
 def jobs_section(job_giver):
     """Jobs management section for job givers"""
-    st.title("My Job Listings")
-    
-    # Debug info - print all session state keys at the start of jobs_section
-    print("Session state keys at start of jobs_section:", list(st.session_state.keys()))
-    print(f"User ID in session: {st.session_state.get('user_id')}")
-    print(f"Username in session: {st.session_state.get('username')}")
-    print(f"User type in session: {st.session_state.get('user_type')}")
-    
-    # Make sure we have a valid user_id in session state
-    if not st.session_state.get('user_id'):
-        print("No user_id in session state in jobs_section - redirecting to login")
-        st.error("Session expired. Please log in again.")
+    user_id_in_section = st.session_state.get('user_id')
+    if not user_id_in_section:
+        print(f"SECTION_ERROR (jobs_section): user_id missing. Logging out.")
+        st.error("Session error in section. Please log in again.")
         st.session_state.logged_in = False
         st.rerun()
         return
+        
+    st.title("My Job Listings")
     
     # If job_giver is None, get it directly from the database
     if not job_giver:
-        print("job_giver object is None in jobs_section, getting it directly")
-        job_giver = JobGiver.get_by_user_id(st.session_state.user_id)
+        print("JOBS_SECTION_WARN: job_giver object is None, attempting to reload.")
+        job_giver = JobGiver.get_by_user_id(user_id_in_section)
         
     # If we still don't have a job_giver, show an error
     if not job_giver:
@@ -488,21 +493,21 @@ def jobs_section(job_giver):
 
 def candidates_section(job_giver):
     """Candidate swiping section for job givers"""
-    st.title("Find Candidates for Your Jobs")
-    
-    # Make sure we have a valid user_id in session state
-    if not st.session_state.get('user_id'):
-        st.error("Session expired. Please log in again.")
-        # Clear session state to force re-login
-        for key in list(st.session_state.keys()):
-            del st.session_state[key]
+    user_id_in_section = st.session_state.get('user_id')
+    if not user_id_in_section:
+        print(f"SECTION_ERROR (candidates_section): user_id missing. Logging out.")
+        st.error("Session error in section. Please log in again.")
+        st.session_state.logged_in = False
         st.rerun()
         return
+        
+    st.title("Find Candidates for Your Jobs")
     
     # If job_giver is None, try to reload it from the database
     if not job_giver:
+        print("CANDIDATES_SECTION_WARN: job_giver object is None, attempting to reload.")
         try:
-            job_giver = JobGiver.get_by_user_id(st.session_state.user_id)
+            job_giver = JobGiver.get_by_user_id(user_id_in_section)
             if not job_giver:
                 st.error("Unable to load your profile. Please try refreshing the page.")
                 if st.button("Refresh Page"):
@@ -794,21 +799,21 @@ def candidates_section(job_giver):
 
 def matches_section(job_giver):
     """Matches section for job givers"""
-    st.title("My Matches")
-    
-    # Make sure we have a valid user_id in session state
-    if not st.session_state.get('user_id'):
-        st.error("Session expired. Please log in again.")
-        # Clear session state to force re-login
-        for key in list(st.session_state.keys()):
-            del st.session_state[key]
+    user_id_in_section = st.session_state.get('user_id')
+    if not user_id_in_section:
+        print(f"SECTION_ERROR (matches_section): user_id missing. Logging out.")
+        st.error("Session error in section. Please log in again.")
+        st.session_state.logged_in = False
         st.rerun()
         return
+        
+    st.title("My Matches")
     
     # If job_giver is None, try to reload it from the database
     if not job_giver:
+        print("MATCHES_SECTION_WARN: job_giver object is None, attempting to reload.")
         try:
-            job_giver = JobGiver.get_by_user_id(st.session_state.user_id)
+            job_giver = JobGiver.get_by_user_id(user_id_in_section)
             if not job_giver:
                 st.error("Unable to load your profile. Please try refreshing the page.")
                 if st.button("Refresh Page"):
@@ -899,21 +904,21 @@ def matches_section(job_giver):
 
 def credits_section(job_giver):
     """Credits section for job givers"""
-    st.title("Credits")
-    
-    # Make sure we have a valid user_id in session state
-    if not st.session_state.get('user_id'):
-        st.error("Session expired. Please log in again.")
-        # Clear session state to force re-login
-        for key in list(st.session_state.keys()):
-            del st.session_state[key]
+    user_id_in_section = st.session_state.get('user_id')
+    if not user_id_in_section:
+        print(f"SECTION_ERROR (credits_section): user_id missing. Logging out.")
+        st.error("Session error in section. Please log in again.")
+        st.session_state.logged_in = False
         st.rerun()
         return
+        
+    st.title("Credits")
     
     # If job_giver is None, try to reload it from the database
     if not job_giver:
+        print("CREDITS_SECTION_WARN: job_giver object is None, attempting to reload.")
         try:
-            job_giver = JobGiver.get_by_user_id(st.session_state.user_id)
+            job_giver = JobGiver.get_by_user_id(user_id_in_section)
             if not job_giver:
                 st.error("Unable to load your profile. Please try refreshing the page.")
                 if st.button("Refresh Page"):
