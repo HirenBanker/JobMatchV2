@@ -6,16 +6,26 @@ from app.frontend.job_seeker import job_seeker_dashboard
 from app.frontend.job_giver import job_giver_dashboard
 from app.database.connection import init_db
 from app.frontend.auth import handle_auth_flow
+
+print("APP.PY: Script started. Imports loaded.")
+
 # Initialize the database
+print("APP.PY: Calling init_db()...")
 db_connected = init_db()
+print(f"APP.PY: init_db() returned: {db_connected}")
 
 # Set a flag in session state to indicate if we're in demo mode
 # This needs to be done BEFORE any page tries to access it.
 if "db_connected" not in st.session_state:
     st.session_state.db_connected = db_connected
+    print(f"APP.PY: Set st.session_state.db_connected to {db_connected} (first time)")
 elif not hasattr(st.session_state, 'db_connected'): # Defensive check
     st.session_state.db_connected = db_connected
+    print(f"APP.PY: Set st.session_state.db_connected to {db_connected} (attr missing)")
+else:
+    print(f"APP.PY: st.session_state.db_connected already exists: {st.session_state.db_connected}")
 
+print("APP.PY: Calling st.set_page_config()...")
 # Set page config
 st.set_page_config(
     page_title="JobMatch - Easily Match Jobs",
@@ -23,6 +33,7 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+print("APP.PY: st.set_page_config() completed.")
 
 # Function to get the correct path for static files
 def get_image_path(image_name):
@@ -45,6 +56,7 @@ document.addEventListener('keydown', function(e) {
 """, unsafe_allow_html=True)
 
 # Session state initialization
+print("APP.PY: Initial session state setup starting...")
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 if "user_type" not in st.session_state:
@@ -53,6 +65,7 @@ if "user_id" not in st.session_state:
     st.session_state.user_id = None
 if "admin_login" not in st.session_state:
     st.session_state.admin_login = False
+print("APP.PY: Initial session state setup completed.")
 
 # Check for admin access via URL parameter
 params = st.query_params
@@ -64,10 +77,12 @@ if "admin_access" in params and params["admin_access"][0] == "jobmatch_admin_202
         st.session_state.logged_in = False # Force re-login for admin
         st.session_state.user_type = None  # Clear user type
 
+print("APP.PY: Starting main application flow logic...")
 # Main application flow
 if not st.session_state.get('logged_in', False):
     # User is NOT logged in
     if st.session_state.get('admin_login', False):
+        print("APP.PY: User not logged in. Admin access detected. Showing admin_login_page().")
         admin_login_page()  # Show admin login page if admin_login flag is set
     else:
         # Regular user authentication flow
@@ -76,9 +91,11 @@ if not st.session_state.get('logged_in', False):
         tab1, tab2, tab3 = st.tabs(["Login / Register", "About Us", "Contact Us"])
 
         with tab1:
+            print("APP.PY: User not logged in. Showing Login/Register tab.")
             handle_auth_flow()  # Existing authentication flow
 
         with tab2:
+            print("APP.PY: User not logged in. Showing About Us tab.")
             st.header("About JobMatch")
             st.markdown("""
             Welcome to JobMatch, the revolutionary platform designed to connect talented individuals 
@@ -116,6 +133,7 @@ if not st.session_state.get('logged_in', False):
                 """)
 
         with tab3:
+            print("APP.PY: User not logged in. Showing Contact Us tab.")
             st.header("Contact Us")
             st.image(get_image_path("Contact_us.png"), caption="We're here to help!")
             st.subheader("Get in Touch")
@@ -151,6 +169,7 @@ if not st.session_state.get('logged_in', False):
             
 else:
     # User IS logged in
+    print(f"APP.PY: User logged in as {st.session_state.get('username')} (type: {st.session_state.get('user_type')}).")
     # Show warning if database is not connected
     if not st.session_state.db_connected:
         st.warning("""
@@ -175,8 +194,13 @@ else:
 
     # Route to appropriate dashboard based on user type
     if st.session_state.user_type == "admin":
+        print("APP.PY: Routing to admin_dashboard().")
         admin_dashboard()
     elif st.session_state.user_type == "job_seeker":
+        print("APP.PY: Routing to job_seeker_dashboard().")
         job_seeker_dashboard()
     elif st.session_state.user_type == "job_giver":
+        print("APP.PY: Routing to job_giver_dashboard().")
         job_giver_dashboard()
+
+print("APP.PY: Script execution reached end of file.")
