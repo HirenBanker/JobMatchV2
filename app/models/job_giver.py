@@ -1,5 +1,5 @@
 import psycopg2
-from app.database.connection import get_connection, release_connection
+from app.database.connection import get_connection
 
 class JobGiver:
     def __init__(self, id=None, user_id=None, company_name=None, company_description=None, 
@@ -15,11 +15,11 @@ class JobGiver:
     
     @staticmethod
     def get_by_user_id(user_id):
-        """Get a job giver by user ID with proper connection handling"""
+        """Get a job giver by user ID"""
         conn = None
         try:
             conn = get_connection()
-            if not conn:
+            if conn is None:
                 print("Failed to get database connection")
                 return None
 
@@ -51,7 +51,7 @@ class JobGiver:
             return None
         finally:
             if conn:
-                release_connection(conn)
+                conn.close()
     
     def update_profile(self):
         """Update job giver profile"""
