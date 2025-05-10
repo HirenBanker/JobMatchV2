@@ -137,15 +137,35 @@ def jobs_section(job_giver):
     """Jobs management section for job givers"""
     st.title("My Job Listings")
     
-    # Validate job giver object and session state
-    if not job_giver or not job_giver.id:
-        st.error("Unable to load your profile. Please try refreshing the page.")
+    # First, ensure we have a valid session state
+    if not st.session_state.get('job_giver_initialized'):
+        st.error("Session expired. Please refresh the page.")
         if st.button("Refresh Page"):
-            # Don't reset the current page, just reload the job giver object
             st.session_state.job_giver_initialized = False
             st.rerun()
         return
+
+    # Then validate the job giver object
+    if not job_giver:
+        # Try to reload the job giver object
+        job_giver = JobGiver.get_by_user_id(st.session_state.user_id)
+        if job_giver:
+            st.session_state.job_giver_object = job_giver
+            st.session_state.job_giver_initialized = True
+        else:
+            st.error("Unable to load your profile. Please try refreshing the page.")
+            if st.button("Refresh Page"):
+                st.session_state.job_giver_initialized = False
+                st.rerun()
+            return
     
+    # Validate job giver ID
+    if not job_giver.id:
+        st.error("Invalid job giver profile. Please complete your profile first.")
+        st.session_state.job_giver_current_page = "Profile"
+        st.rerun()
+        return
+
     # Check if job giver has enough credits to post a job
     if job_giver.credits < 1: 
         st.warning("You need at least 1 credit to post a job. Please purchase credits.")
