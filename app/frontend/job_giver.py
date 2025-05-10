@@ -48,18 +48,26 @@ def job_giver_dashboard():
         if menu != "Profile":
             st.warning("Please complete your profile first")
             menu = "Profile"
+            st.session_state.job_giver_current_page = "Profile"
     
     # Display appropriate section based on menu selection
-    if menu == "Profile":
-        profile_section(job_giver)
-    elif menu == "My Jobs":
-        jobs_section(job_giver)
-    elif menu == "Find Candidates":
-        candidates_section(job_giver)
-    elif menu == "My Matches":
-        matches_section(job_giver)
-    elif menu == "Credits":
-        credits_section(job_giver)
+    try:
+        if menu == "Profile":
+            profile_section(job_giver)
+        elif menu == "My Jobs":
+            jobs_section(job_giver)
+        elif menu == "Find Candidates":
+            candidates_section(job_giver)
+        elif menu == "My Matches":
+            matches_section(job_giver)
+        elif menu == "Credits":
+            credits_section(job_giver)
+    except Exception as e:
+        st.error("An error occurred while loading the page. Please try again.")
+        print(f"Error in job_giver_dashboard: {e}")
+        # Reset to Profile page on error
+        st.session_state.job_giver_current_page = "Profile"
+        st.rerun()
 
 def profile_section(job_giver):
     """Profile management section for job givers"""
@@ -119,6 +127,7 @@ def jobs_section(job_giver):
     if not job_giver or not job_giver.id:
         st.error("Unable to load your profile. Please try refreshing the page.")
         if st.button("Refresh Page"):
+            st.session_state.job_giver_current_page = "Profile"
             st.rerun()
         return
     
@@ -126,7 +135,8 @@ def jobs_section(job_giver):
     # TODO: Replace '1' with a dynamically fetched job_post_cost from platform settings
     if job_giver.credits < 1: 
         st.warning("You need at least 1 credit to post a job. Please purchase credits.")
-        st.button("Go to Credits", on_click=set_navigation_target_page, args=("Credits",), key="credits_button_jobs")
+        if st.button("Go to Credits", on_click=set_navigation_target_page, args=("Credits",), key="credits_button_jobs"):
+            return
         return
     
     # Get existing jobs
@@ -135,6 +145,10 @@ def jobs_section(job_giver):
     except Exception as e:
         st.error("Error loading your jobs. Please try again.")
         print(f"Error loading jobs: {e}")
+        # Reset to Profile page on error
+        st.session_state.job_giver_current_page = "Profile"
+        if st.button("Return to Profile"):
+            st.rerun()
         return
     
     # Create tabs for job management and applicants
