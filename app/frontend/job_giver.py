@@ -294,8 +294,48 @@ def jobs_section(job_giver):
     else:
         st.info("You haven't posted any jobs yet.")
 
-    print("JOBS_SECTION_DEBUG: Finished displaying existing jobs (simplified).")
-    return # Keep the rest of the original function commented out for now
+    print("JOBS_SECTION_DEBUG: Finished displaying existing jobs.")
+
+    # --- Reintroduce "Add New Job" form ---
+    st.markdown("---")
+    with st.expander("Add New Job"):
+        with st.form("new_job_form"):
+            job_title = st.text_input("Job Title", key="job_title")
+            
+            col1_form, col2_form = st.columns(2)
+            with col1_form:
+                job_location = st.text_input("Job Location", key="job_location")
+            with col2_form:
+                job_type = st.selectbox("Job Type", 
+                                       ["Full-time", "Part-time", "Contract", "Internship", "Remote"],
+                                       key="job_type")
+            
+            salary_range = st.text_input("Salary Range (e.g., $50,000 - $70,000)", key="salary_range")
+            
+            job_description = st.text_area("Job Description", height=150, key="job_description")
+            
+            # Requirements input (one per line)
+            requirements_text = st.text_area("Requirements (one per line)", height=100, key="requirements_text")
+            
+            submit_button = st.form_submit_button("Post Job")
+            
+            if submit_button:
+                if not job_title or not job_description:
+                    st.error("Job title and description are required")
+                else:
+                    requirements_list = [req.strip() for req in requirements_text.split("\n") if req.strip()]
+                    new_job = Job(
+                        job_giver_id=job_giver.id, title=job_title, description=job_description,
+                        requirements=requirements_list, location=job_location,
+                        salary_range=salary_range, job_type=job_type
+                    )
+                    if new_job.create():
+                        st.success("Job posted successfully!")
+                        st.rerun() # Rerun to show the new job in the list
+                    else:
+                        st.error("Failed to post job. Please try again.")
+    print("JOBS_SECTION_DEBUG: Finished 'Add New Job' form section.")
+    return # Keep the "View Applicants" tab and other original content commented out for now
 
     # --- Original more complex content below (still commented out) ---
     # Create tabs for job management and applicants
