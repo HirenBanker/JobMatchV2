@@ -1,9 +1,10 @@
 import os
 import psycopg2
-from psycopg2 import sql
+from psycopg2 import sql, pool
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 from dotenv import load_dotenv
 import urllib.parse # For parsing DATABASE_URL
+import time
 
 # Load environment variables
 load_dotenv()
@@ -11,39 +12,79 @@ load_dotenv()
 # DATABASE_URL will be used. For local dev, set it in .env
 # e.g., DATABASE_URL=postgresql://user:password@host:port/dbname
 
-def get_connection():
-    """Create a connection to the PostgreSQL database"""
+# Global connection pool
+connection_pool = None
+
+def init_connection_pool():
+    """Initialize the connection pool"""
+    global connection_pool
     try:
         database_url = os.environ.get("DATABASE_URL")
         if not database_url:
             print("Error: DATABASE_URL environment variable not set.")
             return None
         
-        print(f"Attempting to connect to database...")
-        print(f"Database URL (masked): postgresql://***:***@{database_url.split('@')[1] if database_url else 'None'}")
-        
-        # Try to parse the URL to verify its format
-        try:
-            parsed_url = urllib.parse.urlparse(database_url)
-            print(f"Database host: {parsed_url.hostname}")
-            print(f"Database name: {parsed_url.path.lstrip('/')}")
-        except Exception as parse_error:
-            print(f"Error parsing DATABASE_URL: {parse_error}")
-        
-        conn = psycopg2.connect(database_url)
-        print("Database connection successful!")
-        return conn
-    except psycopg2.Error as e:
-        print(f"Error connecting to PostgreSQL database: {type(e).__name__} - {e}")
-        print(f"Error code: {e.pgcode if hasattr(e, 'pgcode') else 'N/A'}")
-        print(f"Error message: {e.pgerror if hasattr(e, 'pgerror') else str(e)}")
-        return None
+        # Create a connection pool
+        connection_pool = pool.SimpleConnectionPool(
+            minconn=1,
+            maxconn=10,
+            dsn=database_url
+        )
+        print("Connection pool initialized successfully")
+        return True
     except Exception as e:
-        print(f"Unexpected error during database connection: {type(e).__name__} - {e}")
-        import traceback
-        print("Full traceback:")
-        print(traceback.format_exc())
-        return None
+        print(f"Error initializing connection pool: {e}")
+        return False
+
+def get_connection():
+    """Get a connection from the pool with retry logic"""
+    global connection_pool
+    
+    # Initialize pool if it doesn't exist
+    if connection_pool is None:
+        if not init_connection_pool():
+            return None
+    
+    max_retries = 3
+    retry_delay = 1  # seconds
+    
+    for attempt in range(max_retries):
+        try:
+            conn = connection_pool.getconn()
+            if conn:
+                # Test the connection
+                cursor = conn.cursor()
+                cursor.execute('SELECT 1')
+                cursor.close()
+                return conn
+        except psycopg2.Error as e:
+            print(f"Database connection attempt {attempt + 1} failed: {e}")
+            if attempt < max_retries - 1:
+                time.sleep(retry_delay)
+                # Try to reinitialize the pool
+                if attempt == 1:  # On second attempt, try to reinitialize the pool
+                    try:
+                        connection_pool.closeall()
+                    except:
+                        pass
+                    init_connection_pool()
+            else:
+                print("All connection attempts failed")
+                return None
+        except Exception as e:
+            print(f"Unexpected error during database connection: {e}")
+            return None
+    
+    return None
+
+def release_connection(conn):
+    """Release a connection back to the pool"""
+    global connection_pool
+    if connection_pool and conn:
+        try:
+            connection_pool.putconn(conn)
+        except Exception as e:
+            print(f"Error releasing connection: {e}")
 
 def create_database_if_not_exists():
     """Create the database specified in DATABASE_URL if it doesn't exist.

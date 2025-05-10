@@ -1,5 +1,5 @@
 import psycopg2
-from app.database.connection import get_connection
+from app.database.connection import get_connection, release_connection
 
 class JobGiver:
     def __init__(self, id=None, user_id=None, company_name=None, company_description=None, 
@@ -15,42 +15,43 @@ class JobGiver:
     
     @staticmethod
     def get_by_user_id(user_id):
-        """Get a job giver by user ID"""
-        conn = get_connection()
-        if conn is None:
-            return None
-        
+        """Get a job giver by user ID with proper connection handling"""
+        conn = None
         try:
+            conn = get_connection()
+            if not conn:
+                print("Failed to get database connection")
+                return None
+
             cursor = conn.cursor()
-            cursor.execute(
-                """
+            cursor.execute("""
                 SELECT id, user_id, company_name, company_description, website, 
                        location, credits, profile_complete
                 FROM job_givers
                 WHERE user_id = %s
-                """,
-                (user_id,)
-            )
+            """, (user_id,))
             
-            giver_data = cursor.fetchone()
-            if giver_data:
+            result = cursor.fetchone()
+            cursor.close()
+            
+            if result:
                 return JobGiver(
-                    id=giver_data[0],
-                    user_id=giver_data[1],
-                    company_name=giver_data[2],
-                    company_description=giver_data[3],
-                    website=giver_data[4],
-                    location=giver_data[5],
-                    credits=giver_data[6],
-                    profile_complete=giver_data[7]
+                    id=result[0],
+                    user_id=result[1],
+                    company_name=result[2],
+                    company_description=result[3],
+                    website=result[4],
+                    location=result[5],
+                    credits=result[6],
+                    profile_complete=result[7]
                 )
             return None
-        except psycopg2.Error as e:
-            print(f"Error getting job giver: {e}")
+        except Exception as e:
+            print(f"Error getting job giver by user ID: {e}")
             return None
         finally:
-            cursor.close()
-            conn.close()
+            if conn:
+                release_connection(conn)
     
     def update_profile(self):
         """Update job giver profile"""

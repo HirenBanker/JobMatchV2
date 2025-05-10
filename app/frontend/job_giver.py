@@ -14,72 +14,78 @@ def set_navigation_target_page(target_page_title):
     st.session_state.navigate_to_page_title = target_page_title
 
 def job_giver_dashboard():
-    """Dashboard for job givers (recruiters)"""
+    """Job Giver Dashboard"""
     # Initialize session state variables if they don't exist
     if 'job_giver_initialized' not in st.session_state:
         st.session_state.job_giver_initialized = False
+    if 'job_giver_object' not in st.session_state:
         st.session_state.job_giver_object = None
+    if 'job_giver_current_page' not in st.session_state:
         st.session_state.job_giver_current_page = "Profile"
 
-    # Get job giver profile if not already initialized
+    # Load job giver profile if not already initialized
     if not st.session_state.job_giver_initialized:
-        job_giver = JobGiver.get_by_user_id(st.session_state.user_id)
-        if job_giver:
-            st.session_state.job_giver_object = job_giver
-            st.session_state.job_giver_initialized = True
-        else:
-            st.error("Unable to load your profile. Please try refreshing the page.")
-            if st.button("Refresh Page"):
+        try:
+            job_giver = JobGiver.get_by_user_id(st.session_state.user_id)
+            if job_giver:
+                st.session_state.job_giver_object = job_giver
+                st.session_state.job_giver_initialized = True
+            else:
+                st.error("Failed to load job giver profile. Please try refreshing the page.")
+                if st.button("Refresh"):
+                    st.session_state.job_giver_initialized = False
+                    st.experimental_rerun()
+                return
+        except Exception as e:
+            st.error(f"Error loading job giver profile: {str(e)}")
+            if st.button("Refresh"):
                 st.session_state.job_giver_initialized = False
-                st.rerun()
+                st.experimental_rerun()
             return
-    else:
-        job_giver = st.session_state.job_giver_object
 
-    # Debug info
-    print(f"Job Giver Dashboard - User ID: {st.session_state.user_id}")
-    if job_giver:
-        print(f"Job Giver ID: {job_giver.id}, Credits: {job_giver.credits}")
-
-    menu_options = ["Profile", "My Jobs", "Find Candidates", "My Matches", "Credits"]
-
-    # Handle programmatic navigation triggered by button clicks
-    if st.session_state.get("navigate_to_page_title"):
-        st.session_state.job_giver_current_page = st.session_state.navigate_to_page_title
-        del st.session_state.navigate_to_page_title
+    # Get the job giver object from session state
+    job_giver = st.session_state.job_giver_object
+    if not job_giver:
+        st.error("Job giver profile not found. Please try logging in again.")
+        if st.button("Return to Login"):
+            st.session_state.clear()
+            st.experimental_rerun()
+        return
 
     # Sidebar menu
-    menu = st.sidebar.radio(
-        "Menu",
-        menu_options,
-        key="job_giver_current_page"
-    )
+    st.sidebar.title("Job Giver Dashboard")
+    menu = ["Profile", "My Jobs", "Post Job", "Credits", "Logout"]
+    choice = st.sidebar.radio("Navigation", menu, index=menu.index(st.session_state.job_giver_current_page))
+
+    # Handle navigation
+    if choice != st.session_state.job_giver_current_page:
+        st.session_state.job_giver_current_page = choice
+        st.experimental_rerun()
 
     # Check if profile is complete
-    if not job_giver or not job_giver.profile_complete:
-        if menu != "Profile":
-            st.warning("Please complete your profile first")
-            menu = "Profile"
-            st.session_state.job_giver_current_page = "Profile"
-    
-    # Display appropriate section based on menu selection
-    try:
-        if menu == "Profile":
-            profile_section(job_giver)
-        elif menu == "My Jobs":
-            jobs_section(job_giver)
-        elif menu == "Find Candidates":
-            candidates_section(job_giver)
-        elif menu == "My Matches":
-            matches_section(job_giver)
-        elif menu == "Credits":
-            credits_section(job_giver)
-    except Exception as e:
-        st.error("An error occurred while loading the page. Please try again.")
-        print(f"Error in job_giver_dashboard: {e}")
-        # Reset to Profile page on error
+    if not job_giver.profile_complete and choice != "Profile":
+        st.warning("Please complete your profile first!")
         st.session_state.job_giver_current_page = "Profile"
-        st.rerun()
+        st.experimental_rerun()
+
+    # Load the appropriate section
+    try:
+        if choice == "Profile":
+            profile_section(job_giver)
+        elif choice == "My Jobs":
+            jobs_section(job_giver)
+        elif choice == "Post Job":
+            post_job_section(job_giver)
+        elif choice == "Credits":
+            credits_section(job_giver)
+        elif choice == "Logout":
+            st.session_state.clear()
+            st.experimental_rerun()
+    except Exception as e:
+        st.error(f"An error occurred: {str(e)}")
+        if st.button("Return to Profile"):
+            st.session_state.job_giver_current_page = "Profile"
+            st.experimental_rerun()
 
 def profile_section(job_giver):
     """Profile management section for job givers"""
