@@ -15,85 +15,99 @@ def set_navigation_target_page(target_page_title):
 
 def job_giver_dashboard():
     """Dashboard for job givers (recruiters)"""
+    # Debug info - print all session state keys at the start
+    print("Session state keys at start of job_giver_dashboard:", list(st.session_state.keys()))
+    print(f"User ID in session: {st.session_state.get('user_id')}")
+    print(f"Username in session: {st.session_state.get('username')}")
+    print(f"User type in session: {st.session_state.get('user_type')}")
+    
     # Make sure we have a valid user_id in session state
     if not st.session_state.get('user_id'):
+        print("No user_id in session state - redirecting to login")
         st.error("Session expired. Please log in again.")
-        # Clear session state to force re-login
-        for key in list(st.session_state.keys()):
-            del st.session_state[key]
+        st.session_state.logged_in = False
         st.rerun()
         return
         
     # Initialize session state variables if they don't exist
-    if 'job_giver_initialized' not in st.session_state:
-        st.session_state.job_giver_initialized = False
-    if 'job_giver_object' not in st.session_state:
-        st.session_state.job_giver_object = None
     if 'job_giver_current_page' not in st.session_state:
         st.session_state.job_giver_current_page = "Profile"
+        print("Initialized job_giver_current_page to Profile")
 
-    # Get job giver profile
-    try:
-        # Always try to get the latest job_giver data from the database
-        job_giver = JobGiver.get_by_user_id(st.session_state.user_id)
-        if job_giver:
-            st.session_state.job_giver_object = job_giver
-            st.session_state.job_giver_initialized = True
-        else:
-            # If we can't get the job_giver from the database, try to use the cached version
-            if st.session_state.job_giver_object:
-                job_giver = st.session_state.job_giver_object
-                print("Using cached job_giver object")
-            else:
-                st.error("Unable to load your profile. Please try refreshing the page.")
-                if st.button("Refresh Page"):
-                    st.session_state.job_giver_initialized = False
-                    st.rerun()
-                return
-    except Exception as e:
-        print(f"Error loading job giver profile: {e}")
-        st.error("An error occurred while loading your profile. Please try again.")
+    # Get job giver profile directly from the database
+    job_giver = JobGiver.get_by_user_id(st.session_state.user_id)
+    
+    # If we couldn't get the job_giver, show an error
+    if not job_giver:
+        print("Failed to load job_giver from database")
+        st.error("Unable to load your profile. Please try refreshing the page.")
         if st.button("Refresh Page"):
             st.rerun()
         return
+        
+    # Debug info
+    print(f"Job Giver Dashboard - User ID: {st.session_state.user_id}")
+    print(f"Job Giver ID: {job_giver.id}, Credits: {job_giver.credits}")
 
     # Debug info
     print(f"Job Giver Dashboard - User ID: {st.session_state.user_id}")
-    if job_giver:
-        print(f"Job Giver ID: {job_giver.id}, Credits: {job_giver.credits}")
+    print(f"Job Giver ID: {job_giver.id}, Credits: {job_giver.credits}")
+    print(f"Current page: {st.session_state.job_giver_current_page}")
 
     menu_options = ["Profile", "My Jobs", "Find Candidates", "My Matches", "Credits"]
 
     # Handle programmatic navigation triggered by button clicks
     if st.session_state.get("navigate_to_page_title"):
+        print(f"Navigating to: {st.session_state.navigate_to_page_title}")
         st.session_state.job_giver_current_page = st.session_state.navigate_to_page_title
         del st.session_state.navigate_to_page_title
 
-    # Sidebar menu - use index to ensure we select the correct option
+    # Use a simpler approach for the menu
+    # Get the current page index
     current_page_index = menu_options.index(st.session_state.job_giver_current_page) if st.session_state.job_giver_current_page in menu_options else 0
+    
+    # Use the radio button with a simple key
     menu = st.sidebar.radio(
         "Menu",
         menu_options,
         index=current_page_index,
-        key="job_giver_menu_selection"
+        key="job_giver_menu_radio"  # Explicit key added
     )
     
-    # Update the current page in session state
-    st.session_state.job_giver_current_page = menu
+    # Update the current page in session state if it changed
+    if menu != st.session_state.job_giver_current_page:
+        print(f"Menu changed from {st.session_state.job_giver_current_page} to {menu}")
+        st.session_state.job_giver_current_page = menu
+        # Force a rerun to ensure the new page is loaded
+        st.rerun()
+    
+    print(f"Current menu selection: {menu}")
 
     # Check if profile is complete
-    if not job_giver or not job_giver.profile_complete:
+    if not job_giver:
+        print("job_giver object is None when checking profile completeness")
+        st.error("Unable to load your profile. Please refresh the page.")
+        if st.button("Refresh Page"):
+            st.rerun()
+        return
+        
+    if not job_giver.profile_complete:
+        print(f"Profile is not complete. Current menu: {menu}")
         if menu != "Profile":
             st.warning("Please complete your profile first")
             menu = "Profile"
             st.session_state.job_giver_current_page = "Profile"
+            print("Redirected to Profile page due to incomplete profile")
     
     # Display appropriate section based on menu selection
     try:
+        print(f"Displaying section for menu: {menu}")
         if menu == "Profile":
             profile_section(job_giver)
         elif menu == "My Jobs":
+            print("About to call jobs_section")
             jobs_section(job_giver)
+            print("Returned from jobs_section")
         elif menu == "Find Candidates":
             candidates_section(job_giver)
         elif menu == "My Matches":
@@ -103,6 +117,9 @@ def job_giver_dashboard():
     except Exception as e:
         st.error("An error occurred while loading the page. Please try again.")
         print(f"Error in job_giver_dashboard: {e}")
+        import traceback
+        print("Full traceback:")
+        print(traceback.format_exc())
         # Don't reset the current page on error, just show the error
         st.stop()
 
@@ -181,34 +198,32 @@ def jobs_section(job_giver):
     """Jobs management section for job givers"""
     st.title("My Job Listings")
     
+    # Debug info - print all session state keys at the start of jobs_section
+    print("Session state keys at start of jobs_section:", list(st.session_state.keys()))
+    print(f"User ID in session: {st.session_state.get('user_id')}")
+    print(f"Username in session: {st.session_state.get('username')}")
+    print(f"User type in session: {st.session_state.get('user_type')}")
+    
     # Make sure we have a valid user_id in session state
     if not st.session_state.get('user_id'):
+        print("No user_id in session state in jobs_section - redirecting to login")
         st.error("Session expired. Please log in again.")
-        # Clear session state to force re-login
-        for key in list(st.session_state.keys()):
-            del st.session_state[key]
+        st.session_state.logged_in = False
         st.rerun()
         return
     
-    # If job_giver is None, try to reload it from the database
+    # If job_giver is None, get it directly from the database
     if not job_giver:
-        try:
-            job_giver = JobGiver.get_by_user_id(st.session_state.user_id)
-            if job_giver:
-                # Update session state with the loaded job_giver
-                st.session_state.job_giver_object = job_giver
-                st.session_state.job_giver_initialized = True
-            else:
-                st.error("Unable to load your profile. Please try refreshing the page.")
-                if st.button("Refresh Page"):
-                    st.rerun()
-                return
-        except Exception as e:
-            print(f"Error loading job giver profile in jobs_section: {e}")
-            st.error("An error occurred while loading your profile. Please try again.")
-            if st.button("Refresh Page"):
-                st.rerun()
-            return
+        print("job_giver object is None in jobs_section, getting it directly")
+        job_giver = JobGiver.get_by_user_id(st.session_state.user_id)
+        
+    # If we still don't have a job_giver, show an error
+    if not job_giver:
+        print("Failed to get job_giver from database")
+        st.error("Unable to load your profile. Please try refreshing the page.")
+        if st.button("Refresh Page"):
+            st.rerun()
+        return
     
     # Check if profile is complete
     if not job_giver.profile_complete or not job_giver.company_name:
@@ -219,10 +234,18 @@ def jobs_section(job_giver):
         return
 
     # Check if job giver has enough credits to post a job
-    if job_giver.credits < 1: 
-        st.warning("You need at least 1 credit to post a job. Please purchase credits.")
-        if st.button("Go to Credits", on_click=set_navigation_target_page, args=("Credits",), key="credits_button_jobs"):
+    try:
+        if job_giver.credits < 1: 
+            st.warning("You need at least 1 credit to post a job. Please purchase credits.")
+            if st.button("Go to Credits", key="credits_button_jobs"):
+                st.session_state.job_giver_current_page = "Credits"
+                st.rerun()
             return
+    except Exception as e:
+        print(f"Error checking credits: {e}")
+        st.error("Error checking your credits. Please refresh the page.")
+        if st.button("Refresh Page"):
+            st.rerun()
         return
     
     # Get existing jobs
@@ -507,10 +530,18 @@ def candidates_section(job_giver):
             return
 
     # Check if job giver has enough credits
-    if job_giver.credits < 10: # TODO: Replace '10' with dynamically fetched view_match_cost
-        st.warning("You need at least 10 credits to match with candidates. Please purchase credits.")
-        if st.button("Go to Credits", on_click=set_navigation_target_page, args=("Credits",), key="credits_button_candidates"):
-            pass # The on_click callback handles setting the state and Streamlit reruns automatically
+    try:
+        if job_giver.credits < 10: # TODO: Replace '10' with dynamically fetched view_match_cost
+            st.warning("You need at least 10 credits to match with candidates. Please purchase credits.")
+            if st.button("Go to Credits", key="credits_button_candidates"):
+                st.session_state.job_giver_current_page = "Credits"
+                st.rerun()
+            return
+    except Exception as e:
+        print(f"Error checking credits in candidates_section: {e}")
+        st.error("Error checking your credits. Please refresh the page.")
+        if st.button("Refresh Page"):
+            st.rerun()
         return
     
     # Get existing jobs
@@ -519,7 +550,7 @@ def candidates_section(job_giver):
     if not jobs:
         st.warning("You need to post at least one job before you can match with candidates.")
         if st.button("Go to Jobs"):
-            st.session_state.job_giver_menu = "My Jobs"
+            st.session_state.job_giver_current_page = "My Jobs"
             st.rerun()
         return
     
