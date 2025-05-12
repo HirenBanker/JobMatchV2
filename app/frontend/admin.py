@@ -12,7 +12,7 @@ def admin_dashboard():
     # Sidebar menu
     admin_menu = st.sidebar.radio(
         "Admin Menu",
-        ["Dashboard", "Manage Users", "Manage Jobs", "Credit Transactions", "Redemption Requests", "System Settings"],
+        ["Dashboard", "Manage Users", "Manage Jobs", "Credit Transactions", "Manage Credits", "Redemption Requests", "System Settings"],
         key="admin_menu"
     )
     
@@ -24,6 +24,8 @@ def admin_dashboard():
         manage_jobs()
     elif admin_menu == "Credit Transactions":
         credit_transactions()
+    elif admin_menu == "Manage Credits":
+        manage_user_credits()
     elif admin_menu == "Redemption Requests":
         redemption_requests()
     elif admin_menu == "System Settings":
@@ -1021,6 +1023,150 @@ def manage_admin_users():
     
     except Exception as e:
         st.error(f"Error managing admin users: {e}")
+    finally:
+        cursor.close()
+        conn.close()
+
+def manage_user_credits():
+    """Manage user credits section"""
+    st.header("Manage User Credits")
+    
+    # Get database connection
+    conn = get_connection()
+    if conn is None:
+        st.error("Could not connect to database")
+        return
+    
+    try:
+        cursor = conn.cursor()
+        
+        # Get all users with their credit balances
+        cursor.execute("""
+            SELECT 
+                u.id,
+                u.username,
+                u.user_type,
+                COALESCE(jg.credits, 0) as job_giver_credits,
+                COALESCE(js.credits, 0) as job_seeker_credits
+            FROM users u
+            LEFT JOIN job_givers jg ON u.id = jg.user_id
+            LEFT JOIN job_seekers js ON u.id = js.user_id
+            WHERE u.user_type != 'admin'
+            ORDER BY u.username
+        """)
+        
+        users = cursor.fetchall()
+        
+        if users:
+            # Create DataFrame for display
+            user_df = pd.DataFrame(
+                users,
+                columns=["ID", "Username", "User Type", "Job Giver Credits", "Job Seeker Credits"]
+            )
+            
+            # Format user type for display
+            user_df["User Type"] = user_df["User Type"].apply(
+                lambda x: "Candidate" if x == "job_seeker" else "Recruiter"
+            )
+            
+            # Display users and their credit balances
+            st.dataframe(user_df)
+            
+            # Credit modification form
+            st.subheader("Modify User Credits")
+            
+            # User selection
+            selected_user = st.selectbox(
+                "Select User",
+                options=[(row[0], f"{row[1]} ({row[2]})") for row in users],
+                format_func=lambda x: x[1]
+            )
+            
+            if selected_user:
+                user_id = selected_user[0]
+                user_type = next(row[2] for row in users if row[0] == user_id)
+                
+                # Get current credit balance
+                current_credits = next(
+                    row[3] if user_type == "job_giver" else row[4]
+                    for row in users if row[0] == user_id
+                )
+                
+                st.write(f"Current Credit Balance: {current_credits}")
+                
+                # Credit modification form
+                with st.form("modify_credits_form"):
+                    credit_change = st.number_input(
+                        "Credit Change Amount",
+                        min_value=-1000,
+                        max_value=1000,
+                        value=0,
+                        help="Enter positive number to add credits, negative to remove"
+                    )
+                    
+                    reason = st.text_area(
+                        "Reason for Credit Change",
+                        help="Please provide a reason for this credit modification"
+                    )
+                    
+                    submit_button = st.form_submit_button("Apply Credit Change")
+                    
+                    if submit_button:
+                        if not reason:
+                            st.error("Please provide a reason for the credit change")
+                        else:
+                            try:
+                                # Start transaction
+                                cursor.execute("BEGIN")
+                                
+                                # Update credits based on user type
+                                if user_type == "job_giver":
+                                    cursor.execute(
+                                        """
+                                        UPDATE job_givers
+                                        SET credits = credits + %s
+                                        WHERE user_id = %s
+                                        RETURNING credits
+                                        """,
+                                        (credit_change, user_id)
+                                    )
+                                else:  # job_seeker
+                                    cursor.execute(
+                                        """
+                                        UPDATE job_seekers
+                                        SET credits = credits + %s
+                                        WHERE user_id = %s
+                                        RETURNING credits
+                                        """,
+                                        (credit_change, user_id)
+                                    )
+                                
+                                new_balance = cursor.fetchone()[0]
+                                
+                                # Record the transaction
+                                cursor.execute(
+                                    """
+                                    INSERT INTO credit_transactions 
+                                    (user_id, amount, transaction_type, description)
+                                    VALUES (%s, %s, %s, %s)
+                                    """,
+                                    (user_id, credit_change, 'admin_adjustment', f'Admin adjustment: {reason}')
+                                )
+                                
+                                # Commit transaction
+                                conn.commit()
+                                
+                                st.success(f"Credit balance updated successfully! New balance: {new_balance}")
+                                st.rerun()
+                                
+                            except Exception as e:
+                                conn.rollback()
+                                st.error(f"Error updating credits: {e}")
+        else:
+            st.info("No users found")
+    
+    except Exception as e:
+        st.error(f"Error managing user credits: {e}")
     finally:
         cursor.close()
         conn.close()
