@@ -142,23 +142,6 @@ def init_tables():
         ON CONFLICT (key) DO NOTHING
         """)
         
-        # Create job_seekers table
-        cursor.execute("""
-        CREATE TABLE IF NOT EXISTS job_seekers (
-            id SERIAL PRIMARY KEY,
-            user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-            full_name VARCHAR(100),
-            bio TEXT,
-            skills TEXT[],
-            experience INTEGER,
-            education TEXT,
-            location VARCHAR(100),
-            cv_path VARCHAR(255),
-            credits INTEGER DEFAULT 0,
-            profile_complete BOOLEAN DEFAULT FALSE
-        )
-        """)
-        
         # Create job_givers table
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS job_givers (
@@ -169,7 +152,26 @@ def init_tables():
             website VARCHAR(255),
             location VARCHAR(100),
             credits INTEGER DEFAULT 0,
-            profile_complete BOOLEAN DEFAULT FALSE
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """)
+        
+        # Create job_seekers table
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS job_seekers (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+            full_name VARCHAR(100),
+            bio TEXT,
+            skills TEXT[],
+            experience INTEGER,
+            education VARCHAR(100),
+            location VARCHAR(100),
+            cv_path VARCHAR(255),
+            credits INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         """)
         
@@ -184,8 +186,9 @@ def init_tables():
             location VARCHAR(100),
             salary_range VARCHAR(100),
             job_type VARCHAR(50),
+            active BOOLEAN DEFAULT TRUE,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            active BOOLEAN DEFAULT TRUE
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         """)
         
@@ -197,45 +200,25 @@ def init_tables():
             target_id INTEGER NOT NULL,
             target_type VARCHAR(20) NOT NULL,
             direction VARCHAR(10) NOT NULL,
+            job_id INTEGER REFERENCES jobs(id) ON DELETE CASCADE,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         """)
-        
-        # Check if job_id column exists in swipes table
-        cursor.execute("""
-        SELECT column_name 
-        FROM information_schema.columns 
-        WHERE table_name='swipes' AND column_name='job_id'
-        """)
-        
-        job_id_column_exists = cursor.fetchone() is not None
-        
-        # Add job_id column if it doesn't exist
-        if not job_id_column_exists:
-            try:
-                cursor.execute("""
-                ALTER TABLE swipes 
-                ADD COLUMN job_id INTEGER REFERENCES jobs(id) ON DELETE CASCADE
-                """)
-                print("Added job_id column to swipes table")
-            except Exception as e:
-                print(f"Error adding job_id column: {e}")
-                # Continue even if this fails - the application will handle missing column
         
         # Create matches table
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS matches (
             id SERIAL PRIMARY KEY,
-            job_seeker_id INTEGER REFERENCES job_seekers(id) ON DELETE CASCADE,
             job_giver_id INTEGER REFERENCES job_givers(id) ON DELETE CASCADE,
+            job_seeker_id INTEGER REFERENCES job_seekers(id) ON DELETE CASCADE,
             job_id INTEGER REFERENCES jobs(id) ON DELETE CASCADE,
+            status VARCHAR(20) DEFAULT 'active',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            status VARCHAR(20) DEFAULT 'active'
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         """)
         
-        # Create credit_transactions table
-        # Note: price_inr is NUMERIC(10, 2) to store currency values accurately.
+        # Create credit_packages table
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS credit_packages (
             id SERIAL PRIMARY KEY,
@@ -259,6 +242,21 @@ def init_tables():
             transaction_type VARCHAR(50) NOT NULL,
             description TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """)
+        
+        # Create payment_transactions table
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS payment_transactions (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+            stripe_payment_id VARCHAR(255) NOT NULL,
+            amount NUMERIC(10, 2) NOT NULL,
+            currency VARCHAR(3) NOT NULL,
+            status VARCHAR(20) NOT NULL,
+            package_id INTEGER REFERENCES credit_packages(id) ON DELETE SET NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         """)
         
@@ -288,7 +286,7 @@ def init_tables():
         print("Database tables initialized successfully")
     except psycopg2.Error as e:
         conn.rollback()
-        print(f"Error initializing tables: {e}")
+        print(f"Error initializing database tables: {e}")
     finally:
         cursor.close()
         conn.close()
