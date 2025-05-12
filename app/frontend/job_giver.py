@@ -7,7 +7,8 @@ from app.models.job_seeker import JobSeeker
 from app.models.swipe import Swipe
 from app.models.match import Match
 from app.database.connection import get_connection
-from app.models.credit_package import CreditPackage # Import the new model
+from app.models.credit_package import CreditPackage
+from app.models.payment import Payment
 
 # Callback function to set the target page for navigation
 def set_navigation_target_page(target_page_title):
@@ -998,27 +999,112 @@ def credits_section(job_giver):
                         if package.description:
                             st.caption(package.description)
                         st.markdown(f"**{package.credits_amount} Credits**")
-                        st.markdown(f"### INR {package.price_inr:.2f}")
-                        if st.button(f"Buy {package.name}", key=f"buy_package_{package.id}"):
-                            if job_giver.add_credits(package.credits_amount):
-                                st.success(f"Successfully purchased {package.credits_amount} credits from {package.name} package!")
-                                st.balloons()
-                                st.rerun()
-                            else:
-                                st.error("Failed to purchase credits. Please try again.")
-    
-    # # Custom amount
-    # st.write("**Custom Amount**")
-    # custom_amount = st.number_input("Number of Credits", min_value=1, value=10, step=1, key="custom_credit_amount")
-    # custom_price = custom_amount * 2  # $2 per credit
-    # 
-    # if st.button(f"Buy {custom_amount} Credits for ${custom_price}", key="buy_custom_credits"):
-    #     if job_giver.add_credits(custom_amount):
-    #         st.success(f"Successfully purchased {custom_amount} credits!")
-    #         st.balloons()
-    #         st.rerun()
-    #     else:
-    #         st.error("Failed to purchase credits. Please try again.")
+                        
+                        # Handle free package differently
+                        if package.price_inr == 0:
+                            st.markdown("### Free")
+                            if st.button(f"Get Free Credits", key=f"buy_package_{package.id}"):
+                                # For free package, directly add credits without payment
+                                conn = get_connection()
+                                if conn:
+                                    try:
+                                        cursor = conn.cursor()
+                                        # Add credits to job giver
+                                        cursor.execute("""
+                                            UPDATE job_givers
+                                            SET credits = credits + %s
+                                            WHERE user_id = %s
+                                        """, (package.credits_amount, user_id_in_section))
+                                        
+                                        # Record transaction
+                                        cursor.execute("""
+                                            INSERT INTO credit_transactions 
+                                            (user_id, amount, transaction_type, description)
+                                            VALUES (%s, %s, %s, %s)
+                                        """, (user_id_in_section, package.credits_amount, 'purchase', f'Purchased {package.credits_amount} credits (Free Package)'))
+                                        
+                                        conn.commit()
+                                        st.success(f"Successfully added {package.credits_amount} free credits to your account!")
+                                        st.rerun()
+                                    except Exception as e:
+                                        conn.rollback()
+                                        st.error(f"Error adding free credits: {e}")
+                                    finally:
+                                        cursor.close()
+                                        conn.close()
+                        else:
+                            st.markdown(f"### ₹{package.price_inr:.2f}")
+                            if st.button(f"Buy {package.name}", key=f"buy_package_{package.id}"):
+                                # Create payment intent
+                                intent = Payment.create_payment_intent(
+                                    amount=package.price_inr,
+                                    user_id=st.session_state.user_id,
+                                    package_id=package.id
+                                )
+                                
+                                if not intent:
+                                    st.error("Error creating payment. Please try again.")
+                                    return
+                                
+                                # Record payment attempt
+                                payment_id = Payment.record_payment(
+                                    user_id=st.session_state.user_id,
+                                    stripe_payment_id=intent.id,
+                                    amount=package.price_inr,
+                                    currency='inr',
+                                    status='pending',
+                                    package_id=package.id
+                                )
+                                
+                                if not payment_id:
+                                    st.error("Error recording payment. Please try again.")
+                                    return
+                                
+                                # Show payment form
+                                st.write("### Complete Your Purchase")
+                                
+                                # Add Stripe Elements
+                                st.markdown(f"""
+                                    <script src="https://js.stripe.com/v3/"></script>
+                                    <script>
+                                        const stripe = Stripe('{os.getenv('STRIPE_PUBLISHABLE_KEY')}');
+                                        const elements = stripe.elements();
+                                        
+                                        // Create card element
+                                        const card = elements.create('card');
+                                        card.mount('#card-element');
+                                        
+                                        // Handle form submission
+                                        const form = document.getElementById('payment-form');
+                                        form.addEventListener('submit', async (event) => {{
+                                            event.preventDefault();
+                                            
+                                            const {{paymentIntent, error}} = await stripe.confirmCardPayment(
+                                                '{intent.client_secret}',
+                                                {{
+                                                    payment_method: {{
+                                                        card: card,
+                                                    }}
+                                                }}
+                                            );
+                                            
+                                            if (error) {{
+                                                // Handle error
+                                                const errorElement = document.getElementById('card-errors');
+                                                errorElement.textContent = error.message;
+                                            }} else {{
+                                                // Payment successful
+                                                window.location.href = '/payment_success?payment_intent=' + paymentIntent.id;
+                                            }}
+                                        }});
+                                    </script>
+                                    
+                                    <form id="payment-form">
+                                        <div id="card-element"></div>
+                                        <div id="card-errors" role="alert"></div>
+                                        <button type="submit">Pay ₹{package.price_inr:.2f}</button>
+                                    </form>
+                                """, unsafe_allow_html=True)
     
     # Transaction history
     st.subheader("Transaction History")
