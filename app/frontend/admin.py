@@ -1069,11 +1069,112 @@ def manage_user_credits():
                 lambda x: "Candidate" if x == "job_seeker" else "Recruiter"
             )
             
-            # Display users and their credit balances
-            st.dataframe(user_df)
+            # Add checkbox column for bulk selection
+            user_df["Select"] = False
             
-            # Credit modification form
-            st.subheader("Modify User Credits")
+            # Display users and their credit balances with checkboxes
+            edited_df = st.data_editor(
+                user_df,
+                column_config={
+                    "Select": st.column_config.CheckboxColumn(
+                        "Select",
+                        help="Select users to reset credits",
+                        default=False,
+                    ),
+                    "ID": st.column_config.NumberColumn(
+                        "ID",
+                        help="User ID",
+                        disabled=True,
+                    ),
+                    "Username": st.column_config.TextColumn(
+                        "Username",
+                        help="User's username",
+                        disabled=True,
+                    ),
+                    "User Type": st.column_config.TextColumn(
+                        "User Type",
+                        help="Type of user",
+                        disabled=True,
+                    ),
+                    "Job Giver Credits": st.column_config.NumberColumn(
+                        "Job Giver Credits",
+                        help="Current credit balance for recruiters",
+                        disabled=True,
+                    ),
+                    "Job Seeker Credits": st.column_config.NumberColumn(
+                        "Job Seeker Credits",
+                        help="Current credit balance for candidates",
+                        disabled=True,
+                    ),
+                },
+                hide_index=True,
+            )
+            
+            # Bulk reset credits section
+            st.subheader("Bulk Credit Reset")
+            st.warning("""
+            ⚠️ **Warning**: This action will reset credits to zero for all selected users.
+            This action cannot be undone. Please ensure you have selected the correct users.
+            """)
+            
+            if st.button("Reset Credits for Selected Users"):
+                selected_users = edited_df[edited_df["Select"] == True]
+                
+                if len(selected_users) == 0:
+                    st.error("Please select at least one user to reset credits")
+                else:
+                    try:
+                        # Start transaction
+                        cursor.execute("BEGIN")
+                        
+                        for _, user in selected_users.iterrows():
+                            user_id = user["ID"]
+                            user_type = "job_giver" if user["User Type"] == "Recruiter" else "job_seeker"
+                            current_credits = user["Job Giver Credits"] if user_type == "job_giver" else user["Job Seeker Credits"]
+                            
+                            # Only reset if user has credits
+                            if current_credits > 0:
+                                # Update credits to zero
+                                if user_type == "job_giver":
+                                    cursor.execute(
+                                        """
+                                        UPDATE job_givers
+                                        SET credits = 0
+                                        WHERE user_id = %s
+                                        """,
+                                        (user_id,)
+                                    )
+                                else:  # job_seeker
+                                    cursor.execute(
+                                        """
+                                        UPDATE job_seekers
+                                        SET credits = 0
+                                        WHERE user_id = %s
+                                        """,
+                                        (user_id,)
+                                    )
+                                
+                                # Record the transaction
+                                cursor.execute(
+                                    """
+                                    INSERT INTO credit_transactions 
+                                    (user_id, amount, transaction_type, description)
+                                    VALUES (%s, %s, %s, %s)
+                                    """,
+                                    (user_id, -current_credits, 'admin_reset', 'Credits reset to zero by admin')
+                                )
+                        
+                        # Commit transaction
+                        conn.commit()
+                        st.success(f"Successfully reset credits for {len(selected_users)} users")
+                        st.rerun()
+                        
+                    except Exception as e:
+                        conn.rollback()
+                        st.error(f"Error resetting credits: {e}")
+            
+            # Individual credit modification form
+            st.subheader("Modify Individual User Credits")
             
             # User selection
             selected_user = st.selectbox(
