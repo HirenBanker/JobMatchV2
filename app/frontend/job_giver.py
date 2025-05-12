@@ -9,6 +9,7 @@ from app.models.match import Match
 from app.database.connection import get_connection
 from app.models.credit_package import CreditPackage
 from app.models.payment import Payment
+import stripe
 
 # Callback function to set the target page for navigation
 def set_navigation_target_page(target_page_title):
@@ -1035,76 +1036,52 @@ def credits_section(job_giver):
                         else:
                             st.markdown(f"### ₹{package.price_inr:.2f}")
                             if st.button(f"Buy {package.name}", key=f"buy_package_{package.id}"):
-                                # Create payment intent
-                                intent = Payment.create_payment_intent(
-                                    amount=package.price_inr,
-                                    user_id=st.session_state.user_id,
-                                    package_id=package.id
-                                )
-                                
-                                if not intent:
-                                    st.error("Error creating payment. Please try again.")
-                                    return
-                                
-                                # Record payment attempt
-                                payment_id = Payment.record_payment(
-                                    user_id=st.session_state.user_id,
-                                    stripe_payment_id=intent.id,
-                                    amount=package.price_inr,
-                                    currency='inr',
-                                    status='pending',
-                                    package_id=package.id
-                                )
-                                
-                                if not payment_id:
-                                    st.error("Error recording payment. Please try again.")
-                                    return
-                                
-                                # Show payment form
-                                st.write("### Complete Your Purchase")
-                                
-                                # Add Stripe Elements
-                                st.markdown(f"""
-                                    <script src="https://js.stripe.com/v3/"></script>
-                                    <script>
-                                        const stripe = Stripe('{os.getenv('STRIPE_PUBLISHABLE_KEY')}');
-                                        const elements = stripe.elements();
-                                        
-                                        // Create card element
-                                        const card = elements.create('card');
-                                        card.mount('#card-element');
-                                        
-                                        // Handle form submission
-                                        const form = document.getElementById('payment-form');
-                                        form.addEventListener('submit', async (event) => {{
-                                            event.preventDefault();
-                                            
-                                            const {{paymentIntent, error}} = await stripe.confirmCardPayment(
-                                                '{intent.client_secret}',
-                                                {{
-                                                    payment_method: {{
-                                                        card: card,
-                                                    }}
-                                                }}
-                                            );
-                                            
-                                            if (error) {{
-                                                // Handle error
-                                                const errorElement = document.getElementById('card-errors');
-                                                errorElement.textContent = error.message;
-                                            }} else {{
-                                                // Payment successful
-                                                window.location.href = '/payment_success?payment_intent=' + paymentIntent.id;
-                                            }}
-                                        }});
-                                    </script>
+                                try:
+                                    # Create a Stripe checkout session
+                                    checkout_session = stripe.checkout.Session.create(
+                                        payment_method_types=['card'],
+                                        line_items=[{
+                                            'price_data': {
+                                                'currency': 'inr',
+                                                'product_data': {
+                                                    'name': package.name,
+                                                    'description': f"{package.credits_amount} Credits",
+                                                },
+                                                'unit_amount': int(package.price_inr * 100),  # Convert to paisa
+                                            },
+                                            'quantity': 1,
+                                        }],
+                                        mode='payment',
+                                        success_url=f"{os.getenv('BASE_URL', 'http://localhost:8501')}/payment_success?session_id={{CHECKOUT_SESSION_ID}}",
+                                        cancel_url=f"{os.getenv('BASE_URL', 'http://localhost:8501')}/credits",
+                                        metadata={
+                                            'user_id': user_id_in_section,
+                                            'package_id': package.id,
+                                            'credits_amount': package.credits_amount
+                                        }
+                                    )
                                     
-                                    <form id="payment-form">
-                                        <div id="card-element"></div>
-                                        <div id="card-errors" role="alert"></div>
-                                        <button type="submit">Pay ₹{package.price_inr:.2f}</button>
-                                    </form>
-                                """, unsafe_allow_html=True)
+                                    # Record payment attempt
+                                    payment_id = Payment.record_payment(
+                                        user_id=user_id_in_section,
+                                        stripe_payment_id=checkout_session.id,
+                                        amount=package.price_inr,
+                                        currency='inr',
+                                        status='pending',
+                                        package_id=package.id
+                                    )
+                                    
+                                    if not payment_id:
+                                        st.error("Error recording payment. Please try again.")
+                                        return
+                                    
+                                    # Redirect to Stripe Checkout
+                                    st.markdown(f'<meta http-equiv="refresh" content="0;url={checkout_session.url}">', unsafe_allow_html=True)
+                                    st.info("Redirecting to payment page...")
+                                    
+                                except Exception as e:
+                                    st.error(f"Error creating payment session: {e}")
+                                    print(f"Payment session error: {e}")
     
     # Transaction history
     st.subheader("Transaction History")
