@@ -1,11 +1,27 @@
 import streamlit as st
 import os
-from app.frontend.admin import admin_dashboard
-from app.frontend.admin_auth import admin_login_page
-from app.frontend.job_seeker import job_seeker_dashboard
-from app.frontend.job_giver import job_giver_dashboard
-from app.database.connection import init_db
-from app.frontend.auth import handle_auth_flow
+import sys
+
+# Try to import Flask-dependent modules, but continue if they fail
+try:
+    from app.frontend.admin import admin_dashboard
+    from app.frontend.admin_auth import admin_login_page
+    from app.frontend.job_seeker import job_seeker_dashboard
+    from app.frontend.job_giver import job_giver_dashboard
+    from app.database.connection import init_db
+    from app.frontend.auth import handle_auth_flow
+except ImportError as e:
+    st.error(f"Error importing modules: {e}")
+    st.info("Installing missing dependencies...")
+    # Try to install Flask if it's missing
+    if "No module named 'flask'" in str(e):
+        import subprocess
+        try:
+            subprocess.check_call([sys.executable, "-m", "pip", "install", "flask"])
+            st.success("Flask installed successfully. Please restart the application.")
+        except Exception as install_error:
+            st.error(f"Failed to install Flask: {install_error}")
+    sys.exit(1)
 
 print("APP.PY: Script started. Imports loaded.")
 
