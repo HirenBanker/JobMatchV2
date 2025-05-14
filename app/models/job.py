@@ -354,3 +354,36 @@ class Job:
         """Deactivate a job listing"""
         self.active = False
         return self.update()
+        
+    def activate(self):
+        """Activate a job listing"""
+        self.active = True
+        return self.update()
+        
+    @staticmethod
+    def set_active_status(job_id, active_status):
+        """Set the active status of a job"""
+        conn = get_connection()
+        if conn is None:
+            return False
+        
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                UPDATE jobs
+                SET active = %s
+                WHERE id = %s
+                """,
+                (active_status, job_id)
+            )
+            
+            conn.commit()
+            return True
+        except psycopg2.Error as e:
+            conn.rollback()
+            print(f"Error updating job active status: {e}")
+            return False
+        finally:
+            cursor.close()
+            conn.close()

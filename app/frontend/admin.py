@@ -4,6 +4,7 @@ from app.database.connection import get_connection
 from app.models.job_giver import JobGiver
 from app.models.credit_package import CreditPackage # Import the new model
 from app.models.user import User
+from app.models.job import Job
 
 def admin_dashboard():
     """Admin dashboard for managing the platform"""
@@ -711,8 +712,14 @@ def manage_jobs():
             st.subheader("Job Details")
             selected_job_id = st.number_input("Enter Job ID to view details", min_value=1, step=1, key="selected_job_id")
             
+            # Store the selected job ID in session state to persist across reruns
             if st.button("View Job Details", key="view_job_details_button"):
+                st.session_state.viewing_job_id = selected_job_id
                 show_job_details(selected_job_id)
+            
+            # If we have a job ID in session state, show its details
+            elif 'viewing_job_id' in st.session_state:
+                show_job_details(st.session_state.viewing_job_id)
         else:
             st.info("No jobs found")
     
@@ -826,6 +833,12 @@ def manage_credit_packages():
 
 def show_job_details(job_id):
     """Show details for a specific job"""
+    # Check if we have a status change message to display
+    if st.session_state.get('job_status_changed', False):
+        st.success(st.session_state.get('job_status_message', 'Job status updated successfully'))
+        # Clear the flag so the message doesn't show again on refresh
+        st.session_state.job_status_changed = False
+    
     conn = get_connection()
     if conn is None:
         st.error("Could not connect to database")
@@ -871,18 +884,25 @@ def show_job_details(job_id):
         st.subheader("Job Actions")
         
         # Activation/Deactivation Button (outside the delete form)
+        
         if active:
             if st.button("Deactivate Job", key=f"deactivate_job_{job_id}"):
-                cursor.execute("UPDATE jobs SET active = FALSE WHERE id = %s", (job_id,))
-                conn.commit()
-                st.success("Job deactivated successfully")
-                st.rerun()
+                if Job.set_active_status(job_id, False):
+                    # Use a session state flag to track the change
+                    st.session_state.job_status_changed = True
+                    st.session_state.job_status_message = "Job deactivated successfully"
+                    st.rerun()
+                else:
+                    st.error("Error deactivating job. Please try again.")
         else:
             if st.button("Activate Job", key=f"activate_job_{job_id}"):
-                cursor.execute("UPDATE jobs SET active = TRUE WHERE id = %s", (job_id,))
-                conn.commit()
-                st.success("Job activated successfully")
-                st.rerun()
+                if Job.set_active_status(job_id, True):
+                    # Use a session state flag to track the change
+                    st.session_state.job_status_changed = True
+                    st.session_state.job_status_message = "Job activated successfully"
+                    st.rerun()
+                else:
+                    st.error("Error activating job. Please try again.")
         
         # Deletion Form
         with st.form(key=f"delete_job_form_{job_id}"):

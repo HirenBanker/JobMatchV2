@@ -138,7 +138,8 @@ def init_tables():
             ('job_seeker_credits_per_match', '10', 'Number of credits a job seeker earns per match'),
             ('job_giver_credits_per_match', '10', 'Number of credits a job giver spends per match'),
             ('min_credits_for_redemption', '100', 'Minimum credits required for redemption'),
-            ('redemption_amount', '100', 'Amount of credits that can be redeemed at once')
+            ('redemption_amount', '100', 'Amount of credits that can be redeemed at once'),
+            ('enable_credit_redemption', 'false', 'Enable or disable credit redemption feature for all users')
         ON CONFLICT (key) DO NOTHING
         """)
         

@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Platform Settings</h2>
+    <div class="card">
+        <div class="card-body">
+            <div class="settings-list">
+                <!-- Settings will be loaded here dynamically -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    loadSettings();
+});
+
+function loadSettings() {
+    fetch('/admin/settings')
+        .then(response => response.json())
+        .then(settings => {
+            const settingsList = document.querySelector('.settings-list');
+            settingsList.innerHTML = settings.map(setting => `
+                <div class="setting-item mb-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5 class="mb-1">${setting.key.replace(/_/g, ' ').toUpperCase()}</h5>
+                            <p class="text-muted mb-0">${setting.description}</p>
+                        </div>
+                        ${setting.key === 'enable_credit_redemption' ? 
+                            `<div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" 
+                                    id="${setting.key}" 
+                                    ${setting.value === 'true' ? 'checked' : ''}
+                                    onchange="updateSetting('${setting.key}', this.checked)">
+                            </div>` :
+                            `<input type="text" class="form-control" 
+                                value="${setting.value}"
+                                onchange="updateSetting('${setting.key}', this.value)">`
+                        }
+                    </div>
+                </div>
+            `).join('');
+        })
+        .catch(error => console.error('Error loading settings:', error));
+}
+
+function updateSetting(key, value) {
+    fetch(`/admin/settings/${key}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ value: value.toString() })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            alert('Error updating setting: ' + data.error);
+            loadSettings(); // Reload to revert changes
+        }
+    })
+    .catch(error => {
+        console.error('Error updating setting:', error);
+        loadSettings(); // Reload to revert changes
+    });
+}
+</script>
+
+<style>
+.setting-item {
+    padding: 1rem;
+    border-bottom: 1px solid #eee;
+}
+
+.setting-item:last-child {
+    border-bottom: none;
+}
+
+.form-check-input {
+    width: 3em;
+    height: 1.5em;
+}
+</style>
+{% endblock %} 
