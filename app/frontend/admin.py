@@ -181,6 +181,20 @@ def manage_users():
 
     st.subheader("User List")
 
+    # Add custom CSS to reduce spacing
+    st.markdown("""
+    <style>
+    .user-row {
+        padding: 1px 0px;
+        margin: 0px;
+    }
+    .header-row {
+        padding-bottom: 5px;
+        font-weight: bold;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
     # Define columns for the user table header
     # Adjust column widths as needed: Checkbox, ID, Username, Email, Type, Status
     cols_header = st.columns([0.5, 0.5, 2, 2.5, 1, 1]) 
@@ -188,7 +202,8 @@ def manage_users():
     for col, header_text in zip(cols_header, headers):
         col.markdown(f"**{header_text}**")
     
-    st.markdown("---") # Separator after headers
+    # Thin separator after header
+    st.markdown("<hr style='margin: 0; padding: 0; height: 1px'>", unsafe_allow_html=True)
 
     # Store user IDs that are selected in this session
     selected_user_ids = []
@@ -196,39 +211,42 @@ def manage_users():
     # Flag to check if admin is trying to select themselves (prevent self-suspension/deletion)
     admin_selected_self = False
 
+    # Display users in a more compact way
     for user_dict in users: # Renamed to user_dict to avoid conflict with User class
         user_id_str = str(user_dict['id']) # Ensure user_id is string for unique keys
         
         # Create columns for each user row
-        cols_user = st.columns([0.5, 0.5, 2, 2.5, 1, 1]) # Same widths as header
-        
-        # Check if this user is the current admin
-        is_self = (int(user_dict['id']) == int(current_admin_user_id))
-        
-        # Add checkbox for selection
-        user_selected = cols_user[0].checkbox("", key=f"select_user_{user_id_str}", value=user_id_str in st.session_state.selected_users)
-        
-        if user_selected:
-            selected_user_ids.append(user_id_str)
-            if is_self:
-                admin_selected_self = True
-        
-        cols_user[1].write(user_dict['id'])
-        cols_user[2].write(user_dict['username'])
-        cols_user[3].write(user_dict['email'])
-        cols_user[4].write(user_dict['user_type'])
-        
-        status_text = "Active" if user_dict['is_active'] else "Suspended"
-        status_color = "green" if user_dict['is_active'] else "red"
-        cols_user[5].markdown(f":{status_color}[{status_text}]")
-
-        st.markdown("---") # Separator line between users
+        with st.container():
+            st.markdown("<div class='user-row'>", unsafe_allow_html=True)
+            cols_user = st.columns([0.5, 0.5, 2, 2.5, 1, 1]) # Same widths as header
+            
+            # Check if this user is the current admin
+            is_self = (int(user_dict['id']) == int(current_admin_user_id))
+            
+            # Add checkbox for selection
+            user_selected = cols_user[0].checkbox("", key=f"select_user_{user_id_str}", value=user_id_str in st.session_state.selected_users)
+            
+            if user_selected:
+                selected_user_ids.append(user_id_str)
+                if is_self:
+                    admin_selected_self = True
+            
+            cols_user[1].write(user_dict['id'])
+            cols_user[2].write(user_dict['username'])
+            cols_user[3].write(user_dict['email'])
+            cols_user[4].write(user_dict['user_type'])
+            
+            status_text = "Active" if user_dict['is_active'] else "Suspended"
+            status_color = "green" if user_dict['is_active'] else "red"
+            cols_user[5].markdown(f":{status_color}[{status_text}]")
+            st.markdown("</div>", unsafe_allow_html=True)
     
     # Update session state with current selections
     st.session_state.selected_users = selected_user_ids
     
     # Add action buttons at the bottom if any users are selected
     if selected_user_ids:
+        st.markdown("<hr>", unsafe_allow_html=True)
         st.subheader("Actions")
         
         # Show how many users are selected
