@@ -31,7 +31,8 @@ def login_page():
     username = st.text_input("Username", key="login_username")
     password = st.text_input("Password", type="password", key="login_password")
     
-    col1, col2 = st.columns([3, 2]) # Adjust column ratio as needed
+    # Create two columns for login and forgot password buttons
+    col1, col2 = st.columns([3, 2])
 
     with col1:
         if st.button("Login", key="login_button", use_container_width=True):
@@ -68,6 +69,10 @@ def login_page():
             else: # Should not happen, but as a fallback
                 st.error("An unexpected error occurred during login. Please try again.")
     
+    with col2:
+        if st.button("Forgot Password?", key="forgot_password_button", use_container_width=True):
+            st.session_state.auth_view = 'forgot_password_step1'
+            st.rerun()
 
     st.markdown("---")
     st.write("Don't have an account?")
