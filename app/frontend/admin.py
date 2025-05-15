@@ -159,6 +159,15 @@ def manage_users():
     """Manage users section"""
     st.header("Manage Users")
 
+    # Filter options
+    col1, col2 = st.columns(2)
+    with col1:
+        user_type_filter = st.selectbox(
+            "Filter by user type",
+            ["All Users", "Job Seekers", "Job Givers"],
+            key="user_type_filter"
+        )
+
     # Fetch all users using the new method from your User model
     users = User.get_all_managed_users() # This should return a list of dicts
     current_admin_user_id = st.session_state.get("user_id")
@@ -179,161 +188,188 @@ def manage_users():
     if 'selected_users' not in st.session_state:
         st.session_state.selected_users = []
 
-    st.subheader("User List")
+    # Filter users based on selection
+    filtered_users = users
+    if user_type_filter == "Job Seekers":
+        filtered_users = [user for user in users if user['user_type'] == 'job_seeker']
+    elif user_type_filter == "Job Givers":
+        filtered_users = [user for user in users if user['user_type'] == 'job_giver']
 
-    # Add custom CSS to reduce spacing
-    st.markdown("""
-    <style>
-    .user-row {
-        padding: 1px 0px;
-        margin: 0px;
-    }
-    .header-row {
-        padding-bottom: 5px;
-        font-weight: bold;
-    }
-    </style>
-    """, unsafe_allow_html=True)
+    # Create DataFrame for display
+    if filtered_users:
+        user_df = pd.DataFrame(
+            filtered_users,
+            columns=["id", "username", "email", "user_type", "is_active"]
+        )
+        
+        # Rename columns for display
+        user_df.columns = ["ID", "Username", "Email", "User Type", "Active"]
+        
+        # Format user type for better display
+        user_df["User Type"] = user_df["User Type"].apply(
+            lambda x: "Candidate" if x == "job_seeker" else "Recruiter"
+        )
+        
+        # Format active status with checkmark or X
+        user_df["Active"] = user_df["Active"].apply(lambda x: "✅" if x else "❌")
+        
+        # Add checkbox column for selection
+        user_df["Select"] = user_df["ID"].apply(
+            lambda id: str(id) in st.session_state.selected_users
+        )
+        
+        # Reorder columns to put Select first
+        user_df = user_df[["Select", "ID", "Username", "Email", "User Type", "Active"]]
+        
+        # Display as editable dataframe
+        edited_df = st.data_editor(
+            user_df,
+            column_config={
+                "Select": st.column_config.CheckboxColumn(
+                    "Select",
+                    help="Select users for bulk actions",
+                ),
+                "ID": st.column_config.NumberColumn(
+                    "ID",
+                    help="User ID",
+                    disabled=True,
+                ),
+                "Username": st.column_config.TextColumn(
+                    "Username",
+                    help="User's username",
+                    disabled=True,
+                ),
+                "Email": st.column_config.TextColumn(
+                    "Email",
+                    help="User's email",
+                    disabled=True,
+                ),
+                "User Type": st.column_config.TextColumn(
+                    "User Type",
+                    help="Type of user",
+                    disabled=True,
+                ),
+                "Active": st.column_config.TextColumn(
+                    "Active",
+                    help="Account status",
+                    disabled=True,
+                ),
+            },
+            hide_index=True,
+            use_container_width=True,
+        )
+        
+        # Update selected users based on dataframe
+        selected_user_ids = edited_df[edited_df["Select"] == True]["ID"].astype(str).tolist()
+        st.session_state.selected_users = selected_user_ids
+        
+        # Check if admin selected themselves
+        admin_selected_self = str(current_admin_user_id) in selected_user_ids
 
-    # Define columns for the user table header
-    # Adjust column widths as needed: Checkbox, ID, Username, Email, Type, Status
-    cols_header = st.columns([0.5, 0.5, 2, 2.5, 1, 1]) 
-    headers = ["Select", "ID", "Username", "Email", "Type", "Status"]
-    for col, header_text in zip(cols_header, headers):
-        col.markdown(f"**{header_text}**")
-    
-    # Thin separator after header
-    st.markdown("<hr style='margin: 0; padding: 0; height: 1px'>", unsafe_allow_html=True)
-
-    # Store user IDs that are selected in this session
-    selected_user_ids = []
-    
-    # Flag to check if admin is trying to select themselves (prevent self-suspension/deletion)
-    admin_selected_self = False
-
-    # Display users in a more compact way
-    for user_dict in users: # Renamed to user_dict to avoid conflict with User class
-        user_id_str = str(user_dict['id']) # Ensure user_id is string for unique keys
+        # User details section
+        st.subheader("User Details")
+        selected_user_id = st.number_input("Enter User ID to view details", min_value=1, step=1, key="selected_user_id")
         
-        # Create columns for each user row
-        with st.container():
-            st.markdown("<div class='user-row'>", unsafe_allow_html=True)
-            cols_user = st.columns([0.5, 0.5, 2, 2.5, 1, 1]) # Same widths as header
-            
-            # Check if this user is the current admin
-            is_self = (int(user_dict['id']) == int(current_admin_user_id))
-            
-            # Add checkbox for selection
-            user_selected = cols_user[0].checkbox("", key=f"select_user_{user_id_str}", value=user_id_str in st.session_state.selected_users)
-            
-            if user_selected:
-                selected_user_ids.append(user_id_str)
-                if is_self:
-                    admin_selected_self = True
-            
-            cols_user[1].write(user_dict['id'])
-            cols_user[2].write(user_dict['username'])
-            cols_user[3].write(user_dict['email'])
-            cols_user[4].write(user_dict['user_type'])
-            
-            status_text = "Active" if user_dict['is_active'] else "Suspended"
-            status_color = "green" if user_dict['is_active'] else "red"
-            cols_user[5].markdown(f":{status_color}[{status_text}]")
-            st.markdown("</div>", unsafe_allow_html=True)
-    
-    # Update session state with current selections
-    st.session_state.selected_users = selected_user_ids
-    
-    # Add action buttons at the bottom if any users are selected
-    if selected_user_ids:
-        st.markdown("<hr>", unsafe_allow_html=True)
-        st.subheader("Actions")
+        # Store the selected user ID in session state to persist across reruns
+        if st.button("View User Details", key="view_user_details_button"):
+            st.session_state.viewing_user_id = selected_user_id
+            show_user_details(selected_user_id)
         
-        # Show how many users are selected
-        st.write(f"Selected {len(selected_user_ids)} user(s)")
+        # If we have a user ID in session state, show its details
+        elif 'viewing_user_id' in st.session_state:
+            show_user_details(st.session_state.viewing_user_id)
         
-        if admin_selected_self:
-            st.warning("⚠️ You have selected yourself. You cannot suspend or delete your own account.")
+        # Add action buttons at the bottom if any users are selected
+        if selected_user_ids:
+            st.subheader("Bulk Actions")
+            
+            # Show how many users are selected
+            st.write(f"Selected {len(selected_user_ids)} user(s)")
+            
+            if admin_selected_self:
+                st.warning("⚠️ You have selected yourself. You cannot suspend or delete your own account.")
+            
+            # Create 3 columns for the action buttons
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                if st.button("Suspend Selected", type="secondary", use_container_width=True, 
+                            disabled=admin_selected_self):
+                    success_count = 0
+                    for user_id in selected_user_ids:
+                        # Skip if trying to suspend self
+                        if str(user_id) == str(current_admin_user_id):
+                            continue
+                        
+                        if User.set_active_status(user_id, False):
+                            success_count += 1
+                    
+                    if success_count > 0:
+                        st.success(f"Successfully suspended {success_count} user(s).")
+                        # Clear selection
+                        st.session_state.selected_users = []
+                        st.rerun()
+                    else:
+                        st.error("Failed to suspend any users.")
+            
+            with col2:
+                if st.button("Reactivate Selected", type="primary", use_container_width=True):
+                    success_count = 0
+                    for user_id in selected_user_ids:
+                        if User.set_active_status(user_id, True):
+                            success_count += 1
+                    
+                    if success_count > 0:
+                        st.success(f"Successfully reactivated {success_count} user(s).")
+                        # Clear selection
+                        st.session_state.selected_users = []
+                        st.rerun()
+                    else:
+                        st.error("Failed to reactivate any users.")
+            
+            with col3:
+                if st.button("Delete Selected", type="primary", use_container_width=True, 
+                            disabled=admin_selected_self):
+                    # Set a session state variable to trigger confirmation
+                    st.session_state.confirm_bulk_delete = True
+                    st.rerun()
         
-        # Create 3 columns for the action buttons
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            if st.button("Suspend Selected", type="secondary", use_container_width=True, 
-                         disabled=admin_selected_self):
+        # Confirmation dialog for bulk delete
+        if st.session_state.get("confirm_bulk_delete"):
+            selected_count = len(st.session_state.selected_users)
+            
+            st.warning(f"Are you sure you want to delete {selected_count} selected user(s)? This action cannot be undone and will remove all associated data.")
+            
+            # Use columns for button layout
+            confirm_cols = st.columns(6)
+            
+            if confirm_cols[0].button("Yes, Delete Users", key="confirm_bulk_delete_yes", type="primary"):
                 success_count = 0
-                for user_id in selected_user_ids:
-                    # Skip if trying to suspend self
+                for user_id in st.session_state.selected_users:
+                    # Skip if trying to delete self
                     if str(user_id) == str(current_admin_user_id):
                         continue
                     
-                    if User.set_active_status(user_id, False):
+                    success, message = User.delete_user_by_id(user_id, current_admin_user_id)
+                    if success:
                         success_count += 1
                 
                 if success_count > 0:
-                    st.success(f"Successfully suspended {success_count} user(s).")
-                    # Clear selection
-                    st.session_state.selected_users = []
-                    st.rerun()
+                    st.success(f"Successfully deleted {success_count} user(s).")
                 else:
-                    st.error("Failed to suspend any users.")
-        
-        with col2:
-            if st.button("Reactivate Selected", type="primary", use_container_width=True):
-                success_count = 0
-                for user_id in selected_user_ids:
-                    if User.set_active_status(user_id, True):
-                        success_count += 1
+                    st.error("Failed to delete any users.")
                 
-                if success_count > 0:
-                    st.success(f"Successfully reactivated {success_count} user(s).")
-                    # Clear selection
-                    st.session_state.selected_users = []
-                    st.rerun()
-                else:
-                    st.error("Failed to reactivate any users.")
-        
-        with col3:
-            if st.button("Delete Selected", type="primary", use_container_width=True, 
-                         disabled=admin_selected_self):
-                # Set a session state variable to trigger confirmation
-                st.session_state.confirm_bulk_delete = True
+                # Clean up session state variables
+                st.session_state.confirm_bulk_delete = False
+                st.session_state.selected_users = []
                 st.rerun()
-    
-    # Confirmation dialog for bulk delete
-    if st.session_state.get("confirm_bulk_delete"):
-        selected_count = len(st.session_state.selected_users)
-        
-        st.warning(f"Are you sure you want to delete {selected_count} selected user(s)? This action cannot be undone and will remove all associated data.")
-        
-        # Use columns for button layout
-        confirm_cols = st.columns(6)
-        
-        if confirm_cols[0].button("Yes, Delete Users", key="confirm_bulk_delete_yes", type="primary"):
-            success_count = 0
-            for user_id in st.session_state.selected_users:
-                # Skip if trying to delete self
-                if str(user_id) == str(current_admin_user_id):
-                    continue
-                
-                success, message = User.delete_user_by_id(user_id, current_admin_user_id)
-                if success:
-                    success_count += 1
             
-            if success_count > 0:
-                st.success(f"Successfully deleted {success_count} user(s).")
-            else:
-                st.error("Failed to delete any users.")
-            
-            # Clean up session state variables
-            st.session_state.confirm_bulk_delete = False
-            st.session_state.selected_users = []
-            st.rerun()
-        
-        if confirm_cols[1].button("Cancel", key="confirm_bulk_delete_no"):
-            st.session_state.confirm_bulk_delete = False
-            st.rerun()
-   
+            if confirm_cols[1].button("Cancel", key="confirm_bulk_delete_no"):
+                st.session_state.confirm_bulk_delete = False
+                st.rerun()
+    else:
+        st.info("No users found matching the filter criteria.")
+
     # Check for confirmation dialog that might have been triggered by individual delete buttons
     # This is kept for backward compatibility
     if st.session_state.get("confirm_delete_user_id"):
