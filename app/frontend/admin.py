@@ -207,7 +207,7 @@ def manage_users():
         
         # Format user type for better display
         user_df["User Type"] = user_df["User Type"].apply(
-            lambda x: "Candidate" if x == "job_seeker" else "Recruiter"
+            lambda x: "Candidate" if x == "job_seeker" else ("Recruiter" if x == "job_giver" else "Admin")
         )
         
         # Format active status with checkmark or X
