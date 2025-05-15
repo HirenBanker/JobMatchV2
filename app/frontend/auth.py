@@ -48,21 +48,18 @@ def login_page():
                 st.rerun()
                 return
             
-            # User.authenticate now returns User object, "suspended", or None
             auth_result = User.authenticate(username, password) 
             
             if isinstance(auth_result, User): # Successfully authenticated and active
-                # Check if the user is an admin trying to login through regular login
-                if auth_result.user_type == 'admin':
-                    st.error("Admin users should login via the admin portal.")
-                else:
-                    # Regular user login successful
-                    st.session_state.logged_in = True
-                    st.session_state.user_id = auth_result.id
-                    st.session_state.username = auth_result.username
-                    st.session_state.user_type = auth_result.user_type
-                    st.success("Login successful!")
-                    st.rerun()
+                # Allow login for ANY user type if authentication is successful
+                st.session_state.logged_in = True
+                # Set session state with the actual user data returned by authenticate
+                # This allows admins to log in via this page again
+                st.session_state.user_id = auth_result.id
+                st.session_state.username = auth_result.username
+                st.session_state.user_type = auth_result.user_type
+                st.success("Login successful!")
+                st.rerun()
             elif auth_result == "suspended":
                 # Account is suspended
                 st.error("Your account has been suspended. Please contact support.")
